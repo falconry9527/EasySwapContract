@@ -16,7 +16,12 @@ import {IEasySwapVault} from "./interface/IEasySwapVault.sol";
 // import {OrderValidator} from "./OrderValidator.sol";
 // import {ProtocolManager} from "./ProtocolManager.sol";
 
-//  IEasySwapOrderBook,
+// ContextUpgradeable ： 级合约中提供安全的上下文信息访问 __Context_init 
+// 代理模式下直接使用 msg.sender 会导致获取到的是代理合约地址而非实际调用者 
+// 获取正确的调用者地址: address sender = _msgSender(); 
+
+// OwnableUpgradeable ： 权限管理   __Ownable_init -> onlyOwner
+// ReentrancyGuardUpgradeable ：防止提款重入攻击:  __ReentrancyGuard_init -> nonReentrant
 contract EasySwapOrderBook is
     Initializable,
     ContextUpgradeable,
