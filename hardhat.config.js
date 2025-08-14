@@ -10,13 +10,13 @@ const { resolve } = require("path")
 dotenvConfig({ path: resolve(__dirname, "./.env") })
 
 const SEPOLIA_PK_ONE = process.env.SEPOLIA_PK_ONE
-const SEPOLIA_PK_TWO = process.env.SEPOLIA_PK_TWO
+// const SEPOLIA_PK_TWO = process.env.SEPOLIA_PK_TWO
 if (!SEPOLIA_PK_ONE) {
   throw new Error("Please set at least one private key in a .env file")
 }
 
-const MAINNET_PK = process.env.MAINNET_PK
-const MAINNET_ALCHEMY_AK = process.env.MAINNET_ALCHEMY_AK
+// const MAINNET_PK = process.env.MAINNET_PK
+// const MAINNET_ALCHEMY_AK = process.env.MAINNET_ALCHEMY_AK
 
 const SEPOLIA_ALCHEMY_AK = process.env.SEPOLIA_ALCHEMY_AK
 if (!SEPOLIA_ALCHEMY_AK) {
@@ -39,15 +39,15 @@ module.exports = {
     }
   },
   networks: {
-    mainnet: {
-      url: `https://eth-mainnet.g.alchemy.com/v2/${MAINNET_ALCHEMY_AK}`,
-      accounts: [`${MAINNET_PK}`],
-      saveDeployments: true,
-      chainId: 1,
-    },
+    // mainnet: {
+    //   url: `https://eth-mainnet.g.alchemy.com/v2/${MAINNET_ALCHEMY_AK}`,
+    //   accounts: [`${MAINNET_PK}`],
+    //   saveDeployments: true,
+    //   chainId: 1,
+    // },
     sepolia: {
-      url: `https://eth-sepolia.g.alchemy.com/v2/${SEPOLIA_ALCHEMY_AK}`,
-      accounts: [`${SEPOLIA_PK_ONE}`, `${SEPOLIA_PK_TWO}`],
+      url: `https://sepolia.infura.io/v3/${SEPOLIA_ALCHEMY_AK}`,
+      accounts: [`${SEPOLIA_PK_ONE}`],
     },
     // optimism: {
     //   url: `https://rpc.ankr.com/optimism`,
