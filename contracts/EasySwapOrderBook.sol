@@ -67,8 +67,12 @@ contract EasySwapOrderBook is
 
     /**
      * @notice Initialize contracts.
-     * @param newProtocolShare Default protocol fee.
-     * @param newVault easy swap vault address.
+     * @param newProtocolShare Default protocol fee : 手续费
+     * @param newVault easy swap vault address : 存储层合约地址
+     * EasySwapVault ： 是数据存储层，逻辑和数据存储隔离开：数据存储不能升级，因为每次升级就相当于一个新的合约，存储的数据就丢失了
+     *  EIP712Name  : 合约名称
+     *  EIP712Version  ：合约版本
+     * 
      */
     function initialize(
         uint128 newProtocolShare,
@@ -148,15 +152,6 @@ contract EasySwapOrderBook is
      * @param newOrders Multiple order structure data.
      * @return newOrderKeys The unique id of the order is returned in order, if the id is empty, the corresponding order was not created correctly.
      *
-     *   LibOrder.Order : 结构体
-     *   Side side;
-     *   SaleKind saleKind;
-     *   address maker;
-     *   Asset nft;
-     *   Price price; // unit price of nft
-     *   uint64 expiry;
-     *   uint64 salt;
-     *
      */
     function makeOrders(
         LibOrder.Order[] calldata newOrders
@@ -170,29 +165,28 @@ contract EasySwapOrderBook is
     {
         uint256 orderLength = newOrders.length;
         newOrderKeys = new OrderKey[](orderLength);
-        uint128 ETHAmount; // total eth amount
+        uint128 ethAmount; // total eth amount
         for (uint256 i = 0; i < orderLength; ++i) {
             uint128 buyPrice; // the price of bid order
-            // ？？？ nft 为什么会有 amount ？不是 1个tokenID 对应1个 nft 吗
             if (newOrders[i].side == LibOrder.Side.Bid) {
-                buyPrice =
-                    Price.unwrap(newOrders[i].price) *
-                    newOrders[i].nft.amount;
+                // amount : 一般都是1  
+                buyPrice =Price.unwrap(newOrders[i].price) * newOrders[i].nft.amount;
             }
             OrderKey newOrderKey = _makeOrderTry(newOrders[i], buyPrice);
             newOrderKeys[i] = newOrderKey;
-            if (
-                // if the order is not created successfully, the eth will be returned
-                OrderKey.unwrap(newOrderKey) !=
-                OrderKey.unwrap(LibOrder.ORDERKEY_SENTINEL)
-            ) {
-                ETHAmount += buyPrice;
+            if ( OrderKey.unwrap(newOrderKey) != OrderKey.unwrap(LibOrder.ORDERKEY_SENTINEL)) {
+                // newOrderKey != 1 
+                // byte32 转数字 
+                ethAmount += buyPrice;
             }
         }
-        if (msg.value > ETHAmount) {
+        if (msg.value > ethAmount) {
             // return the remaining eth，if the eth is not enough, the transaction will be reverted
-            _msgSender().safeTransferETH(msg.value - ETHAmount);
+            // msg.valu :  是 用户传过来的 金额 
+            // ETHAmount : 是 算出的价格
+            _msgSender().safeTransferETH(msg.value - ethAmount);
         }
+        // 如果资金不够怎么搞 ？？？？？
     }
 
     function _makeOrderTry(
@@ -211,6 +205,7 @@ contract EasySwapOrderBook is
 
             // deposit asset to vault
             if (order.side == LibOrder.Side.List) {
+                // 卖出 NFT ,先把 NFT 转进来
                 if (order.nft.amount != 1) {
                     // limit list order amount to 1
                     return LibOrder.ORDERKEY_SENTINEL;
@@ -222,6 +217,7 @@ contract EasySwapOrderBook is
                     order.nft.tokenId
                 );
             } else if (order.side == LibOrder.Side.Bid) {
+                // 买入 NFT ，先把钱转进来
                 if (order.nft.amount == 0) {
                     return LibOrder.ORDERKEY_SENTINEL;
                 }
@@ -248,7 +244,8 @@ contract EasySwapOrderBook is
         }
     }
 
-      /**
+    /**
+     * 取消订单
      * @dev Cancels multiple orders by their order keys.
      * @param orderKeys The array of order keys to cancel.
      */
@@ -262,7 +259,6 @@ contract EasySwapOrderBook is
         returns (bool[] memory successes)
     {
         successes = new bool[](orderKeys.length);
-
         for (uint256 i = 0; i < orderKeys.length; ++i) {
             bool success = _cancelOrderTry(orderKeys[i]);
             successes[i] = success;
@@ -282,6 +278,7 @@ contract EasySwapOrderBook is
             _removeOrder(order);
             // withdraw asset from vault
             if (order.side == LibOrder.Side.List) {
+                // 取消卖出： 退回NFT
                 IEasySwapVault(_vault).withdrawNFT(
                     orderHash,
                     order.maker,
@@ -289,6 +286,7 @@ contract EasySwapOrderBook is
                     order.nft.tokenId
                 );
             } else if (order.side == LibOrder.Side.Bid) {
+                // 取消买入： 退回ETH
                 uint256 availNFTAmount = order.nft.amount -
                     filledAmount[orderKey];
                 IEasySwapVault(_vault).withdrawETH(
@@ -304,4 +302,136 @@ contract EasySwapOrderBook is
             emit LogSkipOrder(orderKey, order.salt);
         }
     }
+
+    /**
+     * @notice Cancels multiple orders by their order keys.
+     * @dev newOrder's saleKind, side, maker, and nft must match the corresponding order of oldOrderKey, otherwise it will be skipped; only the price can be modified.
+     * @dev newOrder's expiry and salt can be regenerated.
+     * @param editDetails The edit details of oldOrderKey and new order info
+     * @return newOrderKeys The unique id of the order is returned in order, if the id is empty, the corresponding order was not edit correctly.
+     */
+    function editOrders(
+        LibOrder.EditDetail[] calldata editDetails
+    )
+        external
+        payable
+        override
+        whenNotPaused
+        nonReentrant
+        returns (OrderKey[] memory newOrderKeys)
+    {
+        newOrderKeys = new OrderKey[](editDetails.length);
+
+        uint256 bidETHAmount;
+        for (uint256 i = 0; i < editDetails.length; ++i) {
+            (OrderKey newOrderKey, uint256 bidPrice) = _editOrderTry(
+                editDetails[i].oldOrderKey,
+                editDetails[i].newOrder
+            );
+            bidETHAmount += bidPrice;
+            newOrderKeys[i] = newOrderKey;
+        }
+        if (msg.value > bidETHAmount) {
+            // 如果存入的eth过多，退还用户的 eth
+            _msgSender().safeTransferETH(msg.value - bidETHAmount);
+        }
+    }
+
+    function _editOrderTry(
+        OrderKey oldOrderKey,
+        LibOrder.Order calldata newOrder
+    ) internal returns (OrderKey newOrderKey, uint256 deltaBidPrice) {
+        LibOrder.Order memory oldOrder = orders[oldOrderKey].order;
+
+        // check order, only the price and amount can be modified
+        if (
+            (oldOrder.saleKind != newOrder.saleKind) ||
+            (oldOrder.side != newOrder.side) ||
+            (oldOrder.maker != newOrder.maker) ||
+            (oldOrder.nft.collection != newOrder.nft.collection) ||
+            (oldOrder.nft.tokenId != newOrder.nft.tokenId) ||
+            filledAmount[oldOrderKey] >= oldOrder.nft.amount // order cannot be canceled or filled
+        ) {
+            emit LogSkipOrder(oldOrderKey, oldOrder.salt);
+            return (LibOrder.ORDERKEY_SENTINEL, 0);
+        }
+
+        // check new order is valid
+        if (
+            newOrder.maker != _msgSender() ||
+            newOrder.salt == 0 ||
+            (newOrder.expiry < block.timestamp && newOrder.expiry != 0) ||
+            filledAmount[LibOrder.hash(newOrder)] != 0 // order cannot be canceled or filled
+        ) {
+            emit LogSkipOrder(oldOrderKey, newOrder.salt);
+            return (LibOrder.ORDERKEY_SENTINEL, 0);
+        }
+
+        // cancel old order
+        uint256 oldFilledAmount = filledAmount[oldOrderKey];
+        _removeOrder(oldOrder); // remove order from order storage
+        _cancelOrder(oldOrderKey); // cancel order from order book
+        emit LogCancel(oldOrderKey, oldOrder.maker);
+
+        newOrderKey = _addOrder(newOrder); // add new order to order storage
+
+        // make new order
+        if (oldOrder.side == LibOrder.Side.List) {
+            IEasySwapVault(_vault).editNFT(oldOrderKey, newOrderKey);
+        } else if (oldOrder.side == LibOrder.Side.Bid) {
+            uint256 oldRemainingPrice = Price.unwrap(oldOrder.price) *
+                (oldOrder.nft.amount - oldFilledAmount);
+            uint256 newRemainingPrice = Price.unwrap(newOrder.price) *
+                newOrder.nft.amount;
+            if (newRemainingPrice > oldRemainingPrice) {
+                deltaBidPrice = newRemainingPrice - oldRemainingPrice;
+                IEasySwapVault(_vault).editETH{value: uint256(deltaBidPrice)}(
+                    oldOrderKey,
+                    newOrderKey,
+                    oldRemainingPrice,
+                    newRemainingPrice,
+                    oldOrder.maker
+                );
+            } else {
+                IEasySwapVault(_vault).editETH(
+                    oldOrderKey,
+                    newOrderKey,
+                    oldRemainingPrice,
+                    newRemainingPrice,
+                    oldOrder.maker
+                );
+            }
+        }
+
+        emit LogMake(
+            newOrderKey,
+            newOrder.side,
+            newOrder.saleKind,
+            newOrder.maker,
+            newOrder.nft,
+            newOrder.price,
+            newOrder.expiry,
+            newOrder.salt
+        );
+    }
+
+   //============== PausableUpgradeable ==============
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+   //============== payable ==============
+    function withdrawETH(
+        address recipient,
+        uint256 amount
+    ) external nonReentrant onlyOwner {
+        recipient.safeTransferETH(amount);
+        emit LogWithdrawETH(recipient, amount);
+    }
+    receive() external payable {}
+
+
 }

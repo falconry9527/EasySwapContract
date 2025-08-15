@@ -28,16 +28,16 @@ interface IEasySwapOrderBook {
         OrderKey[] calldata orderKeys
     ) external returns (bool[] memory successes);
 
-    // /**
-    //  * @notice Cancels multiple orders by their order keys.
-    //  * @dev newOrder's saleKind, side, maker, and nft must match the corresponding order of oldOrderKey, otherwise it will be skipped; only the price can be modified.
-    //  * @dev newOrder's expiry and salt can be regenerated.
-    //  * @param editDetails The edit details of oldOrderKey and new order info
-    //  * @return newOrderKeys The unique id of the order is returned in order, if the id is empty, the corresponding order was not edit correctly.
-    //  */
-    // function editOrders(
-    //     LibOrder.EditDetail[] calldata editDetails
-    // ) external payable returns (OrderKey[] memory newOrderKeys);
+    /**
+     * @notice Cancels multiple orders by their order keys.
+     * @dev newOrder's saleKind, side, maker, and nft must match the corresponding order of oldOrderKey, otherwise it will be skipped; only the price can be modified.
+     * @dev newOrder's expiry and salt can be regenerated.
+     * @param editDetails The edit details of oldOrderKey and new order info
+     * @return newOrderKeys The unique id of the order is returned in order, if the id is empty, the corresponding order was not edit correctly.
+     */
+    function editOrders(
+        LibOrder.EditDetail[] calldata editDetails
+    ) external payable returns (OrderKey[] memory newOrderKeys);
 
     // function matchOrder(
     //     LibOrder.Order calldata sellOrder,
