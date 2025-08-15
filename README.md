@@ -12,3 +12,13 @@ npx hardhat node
 npx hardhat ignition deploy ./ignition/modules/Lock.js
 ```
 # EasySwapContract
+
+
+
+部署和升级脚本
+```
+npx hardhat clean && npx hardhat compile
+
+npx hardhat deploy   --tags deployNftAuction --network sepolia 
+
+```
