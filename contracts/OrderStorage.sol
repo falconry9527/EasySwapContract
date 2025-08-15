@@ -7,6 +7,9 @@ import {LibOrder, OrderKey} from "./libraries/LibOrder.sol";
 
 error CannotInsertDuplicateOrder(OrderKey orderKey);
 
+/**
+ * 数据存储层一般不支持升级
+ */
 contract OrderStorage is Initializable {
     using RedBlackTreeLibrary for RedBlackTreeLibrary.Tree;
 
@@ -14,12 +17,10 @@ contract OrderStorage is Initializable {
     mapping(OrderKey => LibOrder.DBOrder) public orders;
 
     /// @dev price tree for each collection and side, sorted by price
-    mapping(address => mapping(LibOrder.Side => RedBlackTreeLibrary.Tree))
-        public priceTrees;
+    mapping(address => mapping(LibOrder.Side => RedBlackTreeLibrary.Tree)) public priceTrees;
 
     /// @dev order queue for each collection, side and expecially price, sorted by orderKey
-    mapping(address => mapping(LibOrder.Side => mapping(Price => LibOrder.OrderQueue)))
-        public orderQueues;
+    mapping(address => mapping(LibOrder.Side => mapping(Price => LibOrder.OrderQueue))) public orderQueues;
 
     function __OrderStorage_init() internal onlyInitializing {}
 
@@ -75,9 +76,7 @@ contract OrderStorage is Initializable {
         }
 
         // insert order to order queue
-        LibOrder.OrderQueue storage orderQueue = orderQueues[
-            order.nft.collection
-        ][order.side][order.price];
+        LibOrder.OrderQueue storage orderQueue = orderQueues[order.nft.collection][order.side][order.price];
 
         if (LibOrder.isSentinel(orderQueue.head)) { // 队列是否初始化
             orderQueues[order.nft.collection][order.side][ // 创建新的队列

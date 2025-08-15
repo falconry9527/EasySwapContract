@@ -7,8 +7,8 @@ type OrderKey is bytes32;
 
 library LibOrder {
     enum Side {
-        List,
-        Bid
+        List, // 卖出NFT
+        Bid // 买入NFT/出价
     }
 
     enum SaleKind {
