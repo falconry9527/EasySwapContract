@@ -19,14 +19,14 @@ interface IEasySwapOrderBook {
         LibOrder.Order[] calldata newOrders
     ) external payable returns (OrderKey[] memory newOrderKeys);
 
-    // /**
-    //  * @notice Cancels multiple orders by their order keys.
-    //  * @param orderKeys The array of order keys to cancel.
-    //  * @return successes Array of boolean values indicating the success of each cancellation.
-    //  */
-    // function cancelOrders(
-    //     OrderKey[] calldata orderKeys
-    // ) external returns (bool[] memory successes);
+    /**
+     * @notice Cancels multiple orders by their order keys.
+     * @param orderKeys The array of order keys to cancel.
+     * @return successes Array of boolean values indicating the success of each cancellation.
+     */
+    function cancelOrders(
+        OrderKey[] calldata orderKeys
+    ) external returns (bool[] memory successes);
 
     // /**
     //  * @notice Cancels multiple orders by their order keys.

@@ -247,4 +247,61 @@ contract EasySwapOrderBook is
             emit LogSkipOrder(LibOrder.hash(order), order.salt);
         }
     }
+
+      /**
+     * @dev Cancels multiple orders by their order keys.
+     * @param orderKeys The array of order keys to cancel.
+     */
+    function cancelOrders(
+        OrderKey[] calldata orderKeys
+    )
+        external
+        override
+        whenNotPaused
+        nonReentrant
+        returns (bool[] memory successes)
+    {
+        successes = new bool[](orderKeys.length);
+
+        for (uint256 i = 0; i < orderKeys.length; ++i) {
+            bool success = _cancelOrderTry(orderKeys[i]);
+            successes[i] = success;
+        }
+    }
+
+    function _cancelOrderTry(
+        OrderKey orderKey
+    ) internal returns (bool success) {
+        LibOrder.Order memory order = orders[orderKey].order;
+
+        if (
+            order.maker == _msgSender() &&
+            filledAmount[orderKey] < order.nft.amount // only unfilled order can be canceled
+        ) {
+            OrderKey orderHash = LibOrder.hash(order);
+            _removeOrder(order);
+            // withdraw asset from vault
+            if (order.side == LibOrder.Side.List) {
+                IEasySwapVault(_vault).withdrawNFT(
+                    orderHash,
+                    order.maker,
+                    order.nft.collection,
+                    order.nft.tokenId
+                );
+            } else if (order.side == LibOrder.Side.Bid) {
+                uint256 availNFTAmount = order.nft.amount -
+                    filledAmount[orderKey];
+                IEasySwapVault(_vault).withdrawETH(
+                    orderHash,
+                    Price.unwrap(order.price) * availNFTAmount, // the withdraw amount of eth
+                    order.maker
+                );
+            }
+            _cancelOrder(orderKey);
+            success = true;
+            emit LogCancel(orderKey, order.maker);
+        } else {
+            emit LogSkipOrder(orderKey, order.salt);
+        }
+    }
 }
