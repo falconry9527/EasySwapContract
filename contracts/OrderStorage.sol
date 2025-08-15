@@ -7,9 +7,7 @@ import {LibOrder, OrderKey} from "./libraries/LibOrder.sol";
 
 error CannotInsertDuplicateOrder(OrderKey orderKey);
 
-/**
- * 数据存储层一般不支持升级
- */
+// 数据存储层一般不支持升级
 contract OrderStorage is Initializable {
     using RedBlackTreeLibrary for RedBlackTreeLibrary.Tree;
 
@@ -17,9 +15,11 @@ contract OrderStorage is Initializable {
     mapping(OrderKey => LibOrder.DBOrder) public orders;
 
     /// @dev price tree for each collection and side, sorted by price
+    // nft address->（买入/卖出 -> 价格树 Tree）
     mapping(address => mapping(LibOrder.Side => RedBlackTreeLibrary.Tree)) public priceTrees;
 
     /// @dev order queue for each collection, side and expecially price, sorted by orderKey
+    // nft address->（买入/卖出 -> （价格->订单队列) ）
     mapping(address => mapping(LibOrder.Side => mapping(Price => LibOrder.OrderQueue))) public orderQueues;
 
     function __OrderStorage_init() internal onlyInitializing {}
@@ -68,26 +68,23 @@ contract OrderStorage is Initializable {
         }
 
         // insert price to price tree if not exists
-        RedBlackTreeLibrary.Tree storage priceTree = priceTrees[
-            order.nft.collection
-        ][order.side];
+        RedBlackTreeLibrary.Tree storage priceTree = priceTrees[order.nft.collection][order.side];
         if (!priceTree.exists(order.price)) {
             priceTree.insert(order.price);
         }
 
         // insert order to order queue
+        // OrderKey head;
+        // OrderKey tail;
         LibOrder.OrderQueue storage orderQueue = orderQueues[order.nft.collection][order.side][order.price];
 
         if (LibOrder.isSentinel(orderQueue.head)) { // 队列是否初始化
-            orderQueues[order.nft.collection][order.side][ // 创建新的队列
-                order.price
-            ] = LibOrder.OrderQueue(
+            // 创建新的队列 : 开始和结尾订单都 0 orderkey
+            orderQueues[order.nft.collection][order.side][ order.price] = LibOrder.OrderQueue(
                 LibOrder.ORDERKEY_SENTINEL,
                 LibOrder.ORDERKEY_SENTINEL
             );
-            orderQueue = orderQueues[order.nft.collection][order.side][
-                order.price
-            ];
+            orderQueue = orderQueues[order.nft.collection][order.side][order.price];
         }
         if (LibOrder.isSentinel(orderQueue.tail)) { // 队列是否为空
             orderQueue.head = orderKey;

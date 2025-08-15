@@ -8,12 +8,12 @@ type OrderKey is bytes32;
 library LibOrder {
     enum Side {
         List, // 卖出NFT
-        Bid // 买入NFT/出价
+        Bid // 买入NFT-出价
     }
 
     enum SaleKind {
-        FixedPriceForCollection,
-        FixedPriceForItem
+        FixedPriceForCollection, // 固定价格售卖
+        FixedPriceForItem // 单个不同价格
     }
 
     struct Asset {

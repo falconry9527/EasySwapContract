@@ -23,7 +23,7 @@ abstract contract OrderValidator is
     // fillsStat record orders filled status, key is the order hash,
     // and value is filled amount.
     // Value CANCELLED means the order has been canceled.
-    // 订单号 -> 订单金额 ：CANCELLED 为 已经取消
+    // OrderKey (order 的hash值 ) -> 订单金额 ：CANCELLED 为 已经取消
     mapping(OrderKey => uint256) public filledAmount;
 
     function __OrderValidator_init(
