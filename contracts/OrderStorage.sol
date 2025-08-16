@@ -185,9 +185,6 @@ contract OrderStorage is Initializable {
      * @param saleKind The type of sale (fixed price or auction).
      * @param count The maximum number of orders to retrieve.
      * @param price The maximum price of the orders to retrieve.
-     * @param firstOrderKey The key of the first order to retrieve.
-     * @return resultOrders An array of orders that match the specified criteria.
-     * @return nextOrderKey The key of the next order to retrieve.
      */
     function getOrders(
         address collection,
@@ -195,8 +192,8 @@ contract OrderStorage is Initializable {
         LibOrder.Side side,
         LibOrder.SaleKind saleKind,
         uint256 count,
-        Price price,
-        OrderKey firstOrderKey
+        Price price
+        // OrderKey firstOrderKey
     )
         external
         view
@@ -208,24 +205,20 @@ contract OrderStorage is Initializable {
             // 没有给出价格，就找出最低 和 最高价格
             price = getBestPrice(collection, side);
         } else {
-            if (LibOrder.isSentinel(firstOrderKey)) {
-                // firstOrderKey 不存在，就找出价格附近 最近的价格
-                price = getNextBestPrice(collection, side, price);
-            }
+            price = getNextBestPrice(collection, side, price);
+
         }
 
         uint256 i;
         while (RedBlackTreeLibrary.isNotEmpty(price) && i < count) {
+            // 循环遍历所有价格 price ，直到没有数据
             LibOrder.OrderQueue memory orderQueue = orderQueues[collection][side][price];
             OrderKey orderKey = orderQueue.head;
-            if (LibOrder.isNotSentinel(firstOrderKey)) {
-                while (LibOrder.isNotSentinel(orderKey) && OrderKey.unwrap(orderKey) != OrderKey.unwrap(firstOrderKey)) {
-                    LibOrder.DBOrder memory order = orders[orderKey];
-                    orderKey = order.next;
-                }
-                firstOrderKey = LibOrder.ORDERKEY_SENTINEL;
+            while (LibOrder.isNotSentinel(orderKey)) {
+                LibOrder.DBOrder memory order = orders[orderKey];
+                orderKey = order.next;
             }
-
+       
             while (LibOrder.isNotSentinel(orderKey) && i < count) {
                 LibOrder.DBOrder memory dbOrder = orders[orderKey];
                 orderKey = dbOrder.next;
