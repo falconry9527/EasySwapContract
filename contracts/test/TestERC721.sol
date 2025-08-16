@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract TestERC721 is ERC721, Ownable {
     string private _baseTokenURI;
     constructor() ERC721("BasicNFT", "BNFT") Ownable(msg.sender)  {}
-
+    // 上面构造函数只是用于测试，一般构造函数都要传入 _baseTokenURI
     // constructor(string memory baseURI) ERC721("BasicNFT", "BNFT") Ownable(msg.sender)  {
     //     _baseTokenURI = baseURI;
     // }
