@@ -94,14 +94,17 @@ contract OrderStorage is Initializable {
             orderQueue = orderQueues[order.nft.collection][order.side][order.price];
         }
         if (LibOrder.isSentinel(orderQueue.tail)) { // 队列是否为空
+            // 更新队列
             orderQueue.head = orderKey;
             orderQueue.tail = orderKey;
+            // 更新orders
             orders[orderKey] = LibOrder.DBOrder( // 创建新的订单，插入队列， 下一个订单为sentinel
                 order,
                 LibOrder.ORDERKEY_SENTINEL,
                 LibOrder.ORDERKEY_SENTINEL
             );
         } else { // 队列不为空
+            // 更新 orders
             // 上一个 order（orderQueue.tail） 的 next= orderKey
             orders[orderQueue.tail].next = orderKey; // 将新订单插入队列尾部
             // 本订单的 previous = 上个 order （orderQueue.tail）
@@ -110,6 +113,7 @@ contract OrderStorage is Initializable {
                 orderQueue.tail,
                 LibOrder.ORDERKEY_SENTINEL
             );
+            // 更新队列 
             orderQueue.tail = orderKey;
         }
     }
@@ -134,7 +138,7 @@ contract OrderStorage is Initializable {
             ) {
                 OrderKey temp = orderKey;
                 // emit OrderRemoved(order.nft.collection, orderKey, order.maker, order.side, order.price, order.nft, block.timestamp);
-                // 更新 orderQueue 
+                // ====== 更新 orderQueue 
                 if (OrderKey.unwrap(orderQueue.head) ==OrderKey.unwrap(orderKey)) {
                     orderQueue.head = dbOrder.next;
                 } else {
@@ -144,7 +148,7 @@ contract OrderStorage is Initializable {
                     orderQueue.tail = prevOrderKey;
                 }
                 // 如果只有一个订单 orderQueue ，上面 的两种情况都会运行 , orderQueue head 和 tail 都会被 赋予 LibOrder.ORDERKEY_SENTINEL
-                // 更新 orders
+                // ===== 更新 orders
                 // 修改 上一个 block 的 next
                 if (LibOrder.isNotSentinel(prevOrderKey)) {
                     orders[prevOrderKey].next = dbOrder.next;
@@ -163,6 +167,7 @@ contract OrderStorage is Initializable {
                 orderKey = dbOrder.next;
             }
         }
+
         if (found) {
             if (LibOrder.isSentinel(orderQueue.head)) {
                 // 如果找到订单，而且该价格已经没有订单了，就要删除 orderQueues  ，移除 priceTree

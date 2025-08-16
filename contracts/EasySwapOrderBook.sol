@@ -424,12 +424,12 @@ contract EasySwapOrderBook is
         whenNotPaused
         nonReentrant
     returns (bool[] memory successes){
-  successes = new bool[](matchDetails.length);
 
+        successes = new bool[](matchDetails.length);
         uint128 buyETHAmount;
-
         for (uint256 i = 0; i < matchDetails.length; ++i) {
             LibOrder.MatchDetail calldata matchDetail = matchDetails[i];
+
             (bool success, bytes memory data) = address(this).delegatecall(
                 abi.encodeWithSignature(
                     "matchOrderWithoutPayback((uint8,uint8,address,(uint256,address,uint96),uint128,uint64,uint64),(uint8,uint8,address,(uint256,address,uint96),uint128,uint64,uint64),uint256)",
@@ -438,7 +438,10 @@ contract EasySwapOrderBook is
                     msg.value - buyETHAmount
                 )
             );
-
+            // 为什么不直接 调用 _matchOrder ，要用 delegatecall 去调用 ？？？ 视频里面有
+            //    uint128  buyPrice =_matchOrder( matchDetail.sellOrder,
+            //             matchDetail.buyOrder,
+            //             msg.value - buyETHAmount) ;
             if (success) {
                 successes[i] = success;
                 if (matchDetail.buyOrder.maker == _msgSender()) {
