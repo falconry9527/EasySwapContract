@@ -415,6 +415,225 @@ contract EasySwapOrderBook is
         );
     }
 
+    function matchOrders(
+        LibOrder.MatchDetail[] calldata matchDetails
+    ) external  override payable  
+        whenNotPaused
+        nonReentrant
+    returns (bool[] memory successes){
+  successes = new bool[](matchDetails.length);
+
+        uint128 buyETHAmount;
+
+        for (uint256 i = 0; i < matchDetails.length; ++i) {
+            LibOrder.MatchDetail calldata matchDetail = matchDetails[i];
+            (bool success, bytes memory data) = address(this).delegatecall(
+                abi.encodeWithSignature(
+                    "matchOrderWithoutPayback((uint8,uint8,address,(uint256,address,uint96),uint128,uint64,uint64),(uint8,uint8,address,(uint256,address,uint96),uint128,uint64,uint64),uint256)",
+                    matchDetail.sellOrder,
+                    matchDetail.buyOrder,
+                    msg.value - buyETHAmount
+                )
+            );
+
+            if (success) {
+                successes[i] = success;
+                if (matchDetail.buyOrder.maker == _msgSender()) {
+                    // buy order
+                    uint128 buyPrice;
+                    buyPrice = abi.decode(data, (uint128));
+                    // Calculate ETH the buyer has spent
+                    buyETHAmount += buyPrice;
+                }
+            } else {
+                emit BatchMatchInnerError(i, data);
+            }
+        }
+
+        if (msg.value > buyETHAmount) {
+            // return the remaining eth
+            _msgSender().safeTransferETH(msg.value - buyETHAmount);
+        }
+    }
+
+
+    function matchOrderWithoutPayback(
+        LibOrder.Order calldata sellOrder,
+        LibOrder.Order calldata buyOrder,
+        uint256 msgValue
+    )
+        external
+        payable
+        whenNotPaused
+        onlyDelegateCall
+        returns (uint128 costValue)
+    {
+        costValue = _matchOrder(sellOrder, buyOrder, msgValue);
+    }
+
+    function _matchOrder(
+        LibOrder.Order calldata sellOrder,
+        LibOrder.Order calldata buyOrder,
+        uint256 msgValue
+    ) internal returns (uint128 costValue) {
+        OrderKey sellOrderKey = LibOrder.hash(sellOrder);
+        OrderKey buyOrderKey = LibOrder.hash(buyOrder);
+        _isMatchAvailable(sellOrder, buyOrder, sellOrderKey, buyOrderKey);
+
+        if (_msgSender() == sellOrder.maker) {
+            // sell order
+            // accept bid
+            require(msgValue == 0, "HD: value > 0"); // sell order cannot accept eth
+            bool isSellExist = orders[sellOrderKey].order.maker != address(0); // check if sellOrder exist in order storage
+            _validateOrder(sellOrder, isSellExist);
+            _validateOrder(orders[buyOrderKey].order, false); // check if exist in order storage
+
+            uint128 fillPrice = Price.unwrap(buyOrder.price); // the price of bid order
+            if (isSellExist) {
+                // check if sellOrder exist in order storage , del&fill if exist
+                _removeOrder(sellOrder);
+                _updateFilledAmount(sellOrder.nft.amount, sellOrderKey); // sell order totally filled
+            }
+            _updateFilledAmount(filledAmount[buyOrderKey] + 1, buyOrderKey);
+            emit LogMatch(
+                sellOrderKey,
+                buyOrderKey,
+                sellOrder,
+                buyOrder,
+                fillPrice
+            );
+
+            // transfer nft&eth
+            IEasySwapVault(_vault).withdrawETH(
+                buyOrderKey,
+                fillPrice,
+                address(this)
+            );
+
+            uint128 protocolFee = _shareToAmount(fillPrice, protocolShare);
+            sellOrder.maker.safeTransferETH(fillPrice - protocolFee);
+
+            if (isSellExist) {
+                IEasySwapVault(_vault).withdrawNFT(
+                    sellOrderKey,
+                    buyOrder.maker,
+                    sellOrder.nft.collection,
+                    sellOrder.nft.tokenId
+                );
+            } else {
+                IEasySwapVault(_vault).transferERC721(
+                    sellOrder.maker,
+                    buyOrder.maker,
+                    sellOrder.nft
+                );
+            }
+        } else if (_msgSender() == buyOrder.maker) {
+            // buy order
+            // accept list
+            bool isBuyExist = orders[buyOrderKey].order.maker != address(0);
+            _validateOrder(orders[sellOrderKey].order, false); // check if exist in order storage
+            _validateOrder(buyOrder, isBuyExist);
+
+            uint128 buyPrice = Price.unwrap(buyOrder.price);
+            uint128 fillPrice = Price.unwrap(sellOrder.price);
+            if (!isBuyExist) {
+                require(msgValue >= fillPrice, "HD: value < fill price");
+            } else {
+                require(buyPrice >= fillPrice, "HD: buy price < fill price");
+                IEasySwapVault(_vault).withdrawETH(
+                    buyOrderKey,
+                    buyPrice,
+                    address(this)
+                );
+                // check if buyOrder exist in order storage , del&fill if exist
+                _removeOrder(buyOrder);
+                _updateFilledAmount(filledAmount[buyOrderKey] + 1, buyOrderKey);
+            }
+            _updateFilledAmount(sellOrder.nft.amount, sellOrderKey);
+
+            emit LogMatch(
+                buyOrderKey,
+                sellOrderKey,
+                buyOrder,
+                sellOrder,
+                fillPrice
+            );
+
+            // transfer nft&eth
+            uint128 protocolFee = _shareToAmount(fillPrice, protocolShare);
+            sellOrder.maker.safeTransferETH(fillPrice - protocolFee);
+            if (buyPrice > fillPrice) {
+                buyOrder.maker.safeTransferETH(buyPrice - fillPrice);
+            }
+
+            IEasySwapVault(_vault).withdrawNFT(
+                sellOrderKey,
+                buyOrder.maker,
+                sellOrder.nft.collection,
+                sellOrder.nft.tokenId
+            );
+            costValue = isBuyExist ? 0 : buyPrice;
+        } else {
+            revert("HD: sender invalid");
+        }
+    }
+
+    /**
+     * @notice caculate amount based on share.
+     * @param total the total amount.
+     * @param share the share in base point.
+     */
+    function _shareToAmount(
+        uint128 total,
+        uint128 share
+    ) internal pure returns (uint128) {
+        return (total * share) / LibPayInfo.TOTAL_SHARE;
+    }
+
+    function _isMatchAvailable(
+        LibOrder.Order memory sellOrder,
+        LibOrder.Order memory buyOrder,
+        OrderKey sellOrderKey,
+        OrderKey buyOrderKey
+    ) internal view {
+        require(
+            OrderKey.unwrap(sellOrderKey) != OrderKey.unwrap(buyOrderKey),
+            "HD: same order"
+        );
+        require(
+            sellOrder.side == LibOrder.Side.List &&
+                buyOrder.side == LibOrder.Side.Bid,
+            "HD: side mismatch"
+        );
+        require(
+            sellOrder.saleKind == LibOrder.SaleKind.FixedPriceForItem,
+            "HD: kind mismatch"
+        );
+        require(sellOrder.maker != buyOrder.maker, "HD: same maker");
+        require( // check if the asset is the same
+            buyOrder.saleKind == LibOrder.SaleKind.FixedPriceForCollection ||
+                (sellOrder.nft.collection == buyOrder.nft.collection &&
+                    sellOrder.nft.tokenId == buyOrder.nft.tokenId),
+            "HD: asset mismatch"
+        );
+        require(
+            filledAmount[sellOrderKey] < sellOrder.nft.amount &&
+                filledAmount[buyOrderKey] < buyOrder.nft.amount,
+            "HD: order closed"
+        );
+    }
+
+
+    function matchOrder(
+        LibOrder.Order calldata sellOrder,
+        LibOrder.Order calldata buyOrder
+    ) external payable override whenNotPaused nonReentrant {
+        uint256 costValue = _matchOrder(sellOrder, buyOrder, msg.value);
+        if (msg.value > costValue) {
+            _msgSender().safeTransferETH(msg.value - costValue);
+        }
+    }
+
    //============== PausableUpgradeable ==============
     function unpause() external onlyOwner {
         _unpause();

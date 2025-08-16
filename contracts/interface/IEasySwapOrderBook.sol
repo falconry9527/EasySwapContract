@@ -39,10 +39,10 @@ interface IEasySwapOrderBook {
         LibOrder.EditDetail[] calldata editDetails
     ) external payable returns (OrderKey[] memory newOrderKeys);
 
-    // function matchOrder(
-    //     LibOrder.Order calldata sellOrder,
-    //     LibOrder.Order calldata buyOrder
-    // ) external payable;
+    function matchOrder(
+        LibOrder.Order calldata sellOrder,
+        LibOrder.Order calldata buyOrder
+    ) external payable;
 
     // /**
     //  * @dev Matches multiple orders atomically.
@@ -55,7 +55,7 @@ interface IEasySwapOrderBook {
     //  * @param matchDetails Array of `MatchDetail` structs containing the details of sell and buy order to be matched.
     //  * @return successes Array of boolean values indicating the success of each match.
     //  */
-    // function matchOrders(
-    //     LibOrder.MatchDetail[] calldata matchDetails
-    // ) external payable returns (bool[] memory successes);
+    function matchOrders(
+        LibOrder.MatchDetail[] calldata matchDetails
+    ) external payable returns (bool[] memory successes);
 }
