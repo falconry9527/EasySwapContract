@@ -12,14 +12,18 @@ contract OrderStorage is Initializable {
     using RedBlackTreeLibrary for RedBlackTreeLibrary.Tree;
 
     /// @dev all order keys are wrapped in a sentinel value to avoid collisions
+    // OrderKey->LibOrder.DBOrder(包含下一个订单的  OrderKey next)
+    // orders : 包含所有价格都订单
     mapping(OrderKey => LibOrder.DBOrder) public orders;
 
     /// @dev price tree for each collection and side, sorted by price
     // nft address->（买入/卖出 -> 价格树 Tree）
+    // 价格树：只保留是否有有某个价格，没有保存具体订单
     mapping(address => mapping(LibOrder.Side => RedBlackTreeLibrary.Tree)) public priceTrees;
 
     /// @dev order queue for each collection, side and expecially price, sorted by orderKey
-    // nft address->（买入/卖出 -> （价格->订单队列) ）
+    // nft address->（买入/卖出 -> （价格->订单队列) ） 
+    // 订单队列 只保留 head 和 tail 两个订单 ， 全量订单在 orders 保存
     mapping(address => mapping(LibOrder.Side => mapping(Price => LibOrder.OrderQueue))) public orderQueues;
 
     function __OrderStorage_init() internal onlyInitializing {}
@@ -39,6 +43,7 @@ contract OrderStorage is Initializable {
         price = (side == LibOrder.Side.Bid)
             ? priceTrees[collection][side].last()
             : priceTrees[collection][side].first();
+
     }
 
     function getNextBestPrice(
@@ -54,6 +59,8 @@ contract OrderStorage is Initializable {
             nextBestPrice = (side == LibOrder.Side.Bid)
                 ? priceTrees[collection][side].prev(price)
                 : priceTrees[collection][side].next(price);
+           // 买入 Bid：找更低的价格
+           // 卖出 list：找更高的价格
         }
     }
 
@@ -106,14 +113,13 @@ contract OrderStorage is Initializable {
     function _removeOrder(
         LibOrder.Order memory order
     ) internal returns (OrderKey orderKey) {
-        LibOrder.OrderQueue storage orderQueue = orderQueues[
-            order.nft.collection
-        ][order.side][order.price];
+        LibOrder.OrderQueue storage orderQueue = orderQueues[order.nft.collection][order.side][order.price];
         orderKey = orderQueue.head;
-        OrderKey prevOrderKey;
+        OrderKey prevOrderKey  = LibOrder.ORDERKEY_SENTINEL;
         bool found;
         while (LibOrder.isNotSentinel(orderKey) && !found) {
             LibOrder.DBOrder memory dbOrder = orders[orderKey];
+            // 对 orders 进行循环遍历
             if (
                 (dbOrder.order.maker == order.maker) &&
                 (dbOrder.order.saleKind == order.saleKind) &&
@@ -124,20 +130,17 @@ contract OrderStorage is Initializable {
             ) {
                 OrderKey temp = orderKey;
                 // emit OrderRemoved(order.nft.collection, orderKey, order.maker, order.side, order.price, order.nft, block.timestamp);
-                if (
-                    OrderKey.unwrap(orderQueue.head) ==
-                    OrderKey.unwrap(orderKey)
-                ) {
+                if (OrderKey.unwrap(orderQueue.head) ==OrderKey.unwrap(orderKey)) {
                     orderQueue.head = dbOrder.next;
                 } else {
                     orders[prevOrderKey].next = dbOrder.next;
                 }
-                if (
-                    OrderKey.unwrap(orderQueue.tail) ==
-                    OrderKey.unwrap(orderKey)
-                ) {
+                if (OrderKey.unwrap(orderQueue.tail) ==OrderKey.unwrap(orderKey)) {
                     orderQueue.tail = prevOrderKey;
                 }
+                // 首尾 要修改 orderQueue head 和 tail，不用修改 orders
+                // 中间只用修改 orders 
+                // 如果只有一个订单 orderQueue ，上面 的两种情况都会运行 , orderQueue head 和 tail 都会被 赋予 LibOrder.ORDERKEY_SENTINEL
                 prevOrderKey = orderKey;
                 orderKey = dbOrder.next;
                 delete orders[temp];
@@ -149,12 +152,9 @@ contract OrderStorage is Initializable {
         }
         if (found) {
             if (LibOrder.isSentinel(orderQueue.head)) {
-                delete orderQueues[order.nft.collection][order.side][
-                    order.price
-                ];
-                RedBlackTreeLibrary.Tree storage priceTree = priceTrees[
-                    order.nft.collection
-                ][order.side];
+                // 如果找到订单，而且该价格已经没有订单了，就要删除 orderQueues  ，移除 priceTree
+                delete orderQueues[order.nft.collection][order.side][order.price];
+                RedBlackTreeLibrary.Tree storage priceTree = priceTrees[order.nft.collection][order.side];
                 if (priceTree.exists(order.price)) {
                     priceTree.remove(order.price);
                 }
@@ -192,24 +192,21 @@ contract OrderStorage is Initializable {
         resultOrders = new LibOrder.Order[](count);
 
         if (RedBlackTreeLibrary.isEmpty(price)) {
+            // 没有给出价格，就找出最低 和 最高价格
             price = getBestPrice(collection, side);
         } else {
             if (LibOrder.isSentinel(firstOrderKey)) {
+                // firstOrderKey 不存在，就找出价格附近 最近的价格
                 price = getNextBestPrice(collection, side, price);
             }
         }
 
         uint256 i;
         while (RedBlackTreeLibrary.isNotEmpty(price) && i < count) {
-            LibOrder.OrderQueue memory orderQueue = orderQueues[collection][
-                side
-            ][price];
+            LibOrder.OrderQueue memory orderQueue = orderQueues[collection][side][price];
             OrderKey orderKey = orderQueue.head;
             if (LibOrder.isNotSentinel(firstOrderKey)) {
-                while (
-                    LibOrder.isNotSentinel(orderKey) &&
-                    OrderKey.unwrap(orderKey) != OrderKey.unwrap(firstOrderKey)
-                ) {
+                while (LibOrder.isNotSentinel(orderKey) && OrderKey.unwrap(orderKey) != OrderKey.unwrap(firstOrderKey)) {
                     LibOrder.DBOrder memory order = orders[orderKey];
                     orderKey = order.next;
                 }

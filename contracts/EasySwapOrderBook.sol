@@ -113,9 +113,9 @@ contract EasySwapOrderBook is
         __ReentrancyGuard_init();
         __Pausable_init();
 
-        __OrderStorage_init();
-        __ProtocolManager_init(newProtocolShare);
-        __OrderValidator_init(EIP712Name, EIP712Version);
+        OrderStorage.__OrderStorage_init();
+        ProtocolManager.__ProtocolManager_init(newProtocolShare);
+        OrderValidator.__OrderValidator_init(EIP712Name, EIP712Version);
 
         setVault(newVault);
     }
