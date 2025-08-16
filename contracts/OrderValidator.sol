@@ -19,7 +19,6 @@ abstract contract OrderValidator is
     EIP712Upgradeable
 {
     bytes4 private constant EIP_1271_MAGIC_VALUE = 0x1626ba7e;
-
     uint256 private constant CANCELLED = type(uint256).max;
 
     // fillsStat record orders filled status, key is the order hash,

@@ -39,7 +39,6 @@ library LibOrder {
 
     struct DBOrder {
         Order order;
-        OrderKey previous;
         OrderKey next;
     }
 

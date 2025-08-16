@@ -13,7 +13,7 @@ contract OrderStorage is Initializable {
 
     /// @dev all order keys are wrapped in a sentinel value to avoid collisions
     // OrderKey->LibOrder.DBOrder(包含下一个订单的  OrderKey next)
-    // orders : 包含所有价格都订单
+    // orders : 包含所有价格都订单，每个价格是一条链 
     mapping(OrderKey => LibOrder.DBOrder) public orders;
 
     /// @dev price tree for each collection and side, sorted by price
@@ -100,7 +100,6 @@ contract OrderStorage is Initializable {
             // 更新orders
             orders[orderKey] = LibOrder.DBOrder( // 创建新的订单，插入队列， 下一个订单为sentinel
                 order,
-                LibOrder.ORDERKEY_SENTINEL,
                 LibOrder.ORDERKEY_SENTINEL
             );
         } else { // 队列不为空
@@ -110,7 +109,6 @@ contract OrderStorage is Initializable {
             // 本订单的 previous = 上个 order （orderQueue.tail）
             orders[orderKey] = LibOrder.DBOrder(
                 order,
-                orderQueue.tail,
                 LibOrder.ORDERKEY_SENTINEL
             );
             // 更新队列 
@@ -142,20 +140,11 @@ contract OrderStorage is Initializable {
                 if (OrderKey.unwrap(orderQueue.head) ==OrderKey.unwrap(orderKey)) {
                     orderQueue.head = dbOrder.next;
                 } else {
+                    // orders 开头不要修改，开头之后需要修改
                     orders[prevOrderKey].next = dbOrder.next;
                 }
                 if (OrderKey.unwrap(orderQueue.tail) ==OrderKey.unwrap(orderKey)) {
                     orderQueue.tail = prevOrderKey;
-                }
-                // 如果只有一个订单 orderQueue ，上面 的两种情况都会运行 , orderQueue head 和 tail 都会被 赋予 LibOrder.ORDERKEY_SENTINEL
-                // ===== 更新 orders
-                // 修改 上一个 block 的 next
-                if (LibOrder.isNotSentinel(prevOrderKey)) {
-                    orders[prevOrderKey].next = dbOrder.next;
-                }
-                // 修改 下一个 block 的 previous
-                if (LibOrder.isNotSentinel(dbOrder.next)) {
-                    orders[dbOrder.next].previous = dbOrder.previous;
                 }
                 // 移动到下一个订单
                 prevOrderKey = orderKey;

@@ -229,7 +229,7 @@ contract EasySwapOrderBook is
                     ETHAmount
                 );
             }
-
+            // 把订单加入队列
             _addOrder(order);
 
             emit LogMake(
@@ -278,6 +278,7 @@ contract EasySwapOrderBook is
             filledAmount[orderKey] < order.nft.amount // only unfilled order can be canceled
         ) {
             OrderKey orderHash = LibOrder.hash(order);
+            // 从 orders 移除 
             _removeOrder(order);
             // withdraw asset from vault
             if (order.side == LibOrder.Side.List) {
@@ -423,8 +424,7 @@ contract EasySwapOrderBook is
     ) external  override payable  
         whenNotPaused
         nonReentrant
-    returns (bool[] memory successes){
-
+        returns (bool[] memory successes){
         successes = new bool[](matchDetails.length);
         uint128 buyETHAmount;
         for (uint256 i = 0; i < matchDetails.length; ++i) {
@@ -438,10 +438,8 @@ contract EasySwapOrderBook is
                     msg.value - buyETHAmount
                 )
             );
-            // 为什么不直接 调用 _matchOrder ，要用 delegatecall 去调用 ？？？ 视频里面有
-            //    uint128  buyPrice =_matchOrder( matchDetail.sellOrder,
-            //             matchDetail.buyOrder,
-            //             msg.value - buyETHAmount) ;
+            // 为什么不直接 调用 _matchOrder ，要用 delegatecall 去调用
+            // 允许部分匹配成功 
             if (success) {
                 successes[i] = success;
                 if (matchDetail.buyOrder.maker == _msgSender()) {
