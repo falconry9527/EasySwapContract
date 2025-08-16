@@ -98,12 +98,16 @@ contract OrderStorage is Initializable {
             orderQueue.tail = orderKey;
             orders[orderKey] = LibOrder.DBOrder( // 创建新的订单，插入队列， 下一个订单为sentinel
                 order,
+                LibOrder.ORDERKEY_SENTINEL,
                 LibOrder.ORDERKEY_SENTINEL
             );
         } else { // 队列不为空
+            // 上一个 order（orderQueue.tail） 的 next= orderKey
             orders[orderQueue.tail].next = orderKey; // 将新订单插入队列尾部
+            // 本订单的 previous = 上个 order （orderQueue.tail）
             orders[orderKey] = LibOrder.DBOrder(
                 order,
+                orderQueue.tail,
                 LibOrder.ORDERKEY_SENTINEL
             );
             orderQueue.tail = orderKey;
@@ -130,6 +134,7 @@ contract OrderStorage is Initializable {
             ) {
                 OrderKey temp = orderKey;
                 // emit OrderRemoved(order.nft.collection, orderKey, order.maker, order.side, order.price, order.nft, block.timestamp);
+                // 更新 orderQueue 
                 if (OrderKey.unwrap(orderQueue.head) ==OrderKey.unwrap(orderKey)) {
                     orderQueue.head = dbOrder.next;
                 } else {
@@ -138,9 +143,17 @@ contract OrderStorage is Initializable {
                 if (OrderKey.unwrap(orderQueue.tail) ==OrderKey.unwrap(orderKey)) {
                     orderQueue.tail = prevOrderKey;
                 }
-                // 首尾 要修改 orderQueue head 和 tail，不用修改 orders
-                // 中间只用修改 orders 
                 // 如果只有一个订单 orderQueue ，上面 的两种情况都会运行 , orderQueue head 和 tail 都会被 赋予 LibOrder.ORDERKEY_SENTINEL
+                // 更新 orders
+                // 修改 上一个 block 的 next
+                if (LibOrder.isNotSentinel(prevOrderKey)) {
+                    orders[prevOrderKey].next = dbOrder.next;
+                }
+                // 修改 下一个 block 的 previous
+                if (LibOrder.isNotSentinel(dbOrder.next)) {
+                    orders[dbOrder.next].previous = dbOrder.previous;
+                }
+                // 移动到下一个订单
                 prevOrderKey = orderKey;
                 orderKey = dbOrder.next;
                 delete orders[temp];
