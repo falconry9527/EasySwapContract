@@ -7,10 +7,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract TestERC721 is ERC721, Ownable {
     string private _baseTokenURI;
-    
-    constructor(string memory baseURI) ERC721("BasicNFT", "BNFT") Ownable(msg.sender)  {
-        _baseTokenURI = baseURI;
-    }
+    constructor() ERC721("BasicNFT", "BNFT") Ownable(msg.sender)  {}
+
+    // constructor(string memory baseURI) ERC721("BasicNFT", "BNFT") Ownable(msg.sender)  {
+    //     _baseTokenURI = baseURI;
+    // }
 
     function mint(address to, uint256 tokenId) external onlyOwner {
         _mint(to, tokenId);
