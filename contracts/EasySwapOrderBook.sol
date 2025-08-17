@@ -430,7 +430,7 @@ contract EasySwapOrderBook is
         for (uint256 i = 0; i < matchDetails.length; ++i) {
             LibOrder.MatchDetail calldata matchDetail = matchDetails[i];
 
-            (bool success, bytes memory data) = address(this).delegatecall(
+            (bool success, bytes memory data) = address(this).call(
                 abi.encodeWithSignature(
                     "matchOrderWithoutPayback((uint8,uint8,address,(uint256,address,uint96),uint128,uint64,uint64),(uint8,uint8,address,(uint256,address,uint96),uint128,uint64,uint64),uint256)",
                     matchDetail.sellOrder,

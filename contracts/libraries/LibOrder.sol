@@ -19,7 +19,7 @@ library LibOrder {
     struct Asset {
         uint256 tokenId;
         address collection;
-        uint96 amount;
+        uint96 amount; // 有的NFT 是可以拆分卖的，本项目都是不可拆分的
     }
 
     struct NFTInfo {
