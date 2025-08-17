@@ -5,7 +5,7 @@ const { Side, SaleKind } = require("./common")
 // const { exp } = require("@prb/math")
 
 let owner, addr1, addr2, addrs
-let esVault, esDex, testERC721, testLibOrder
+let esStorage,esVault, esDex, testERC721, testLibOrder
 const AddressZero = "0x0000000000000000000000000000000000000000";
 const Byte32Zero = "0x0000000000000000000000000000000000000000000000000000000000000000";
 const Uint128Max = toBn("340282366920938463463.374607431768211455");
@@ -17,6 +17,7 @@ describe("EasySwap Test", function () {
         [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
         console.log("owner: ", owner.address)
 
+         esStorage = await ethers.getContractFactory("OrderStorage")
          esVault = await ethers.getContractFactory("EasySwapVault")
          esDex = await ethers.getContractFactory("EasySwapOrderBook")
          testERC721 = await ethers.getContractFactory("TestERC721")
@@ -32,6 +33,11 @@ describe("EasySwap Test", function () {
         // await testERC721.waitForDeployment();
         console.log("testERC721 deployed to:", await testERC721.address);
 
+        // 部署 OrderStorage
+        esStorage = await esStorage.deploy()
+        // await testERC721.waitForDeployment();
+        console.log("esStorage deployed to:", await esStorage.address);
+
         // 部署 EasySwapVault
         esVault = await upgrades.deployProxy(esVault, { initializer: 'initialize' });
         // await esVault.waitForDeployment();
@@ -41,7 +47,7 @@ describe("EasySwap Test", function () {
         newProtocolShare = 200;
         EIP712Name = "EasySwapOrderBook"
         EIP712Version = "1"
-        esDex = await upgrades.deployProxy(esDex, [newProtocolShare, esVault.address, EIP712Name, EIP712Version], 
+        esDex = await upgrades.deployProxy(esDex, [newProtocolShare, esVault.address,esStorage.address, EIP712Name, EIP712Version], 
             {initializer: 'initialize' });
         // await esDex.waitForDeployment();
         // console.log("esDex deployed to:", await esDex.address);
@@ -54,6 +60,8 @@ describe("EasySwap Test", function () {
         tx= await esVault.setOrderBook(await esDex.address)
         console.log("esVault setOrderBook tx:", await tx.hash)
 
+        tx2= await esStorage.setOrderBook(await esDex.address)
+        console.log("esStorage setOrderBook tx:", await tx2.hash)
         console.log("============init=========== ")
 
     })
@@ -91,7 +99,7 @@ describe("EasySwap Test", function () {
             const orderHash = await testLibOrder.getOrderHash(order)
             console.log("orderHash: ", orderHash)
 
-            dbOrder = await esDex.orders(orderHash)
+            dbOrder = await esDex.getOrder(orderHash)
             expect(dbOrder.order.maker).to.equal(owner.address)
             expect(await testERC721.ownerOf(tokenId)).to.equal(esVault.address)
 
@@ -149,7 +157,7 @@ describe("EasySwap Test", function () {
             const orderHash = await testLibOrder.getOrderHash(order)
             // console.log("orderHash: ", orderHash)
 
-            dbOrder = await esDex.orders(orderHash)
+            dbOrder = await esDex.getOrder(orderHash)
             // console.log("dbOrder: ", dbOrder)
             expect(dbOrder.order.maker).to.equal(owner.address)
         })
@@ -196,12 +204,12 @@ describe("EasySwap Test", function () {
             console.log("owner 33 ",ownerNft1)
 
             const listOrderHash = await testLibOrder.getOrderHash(listOrder)
-            dbOrder = await esDex.orders(listOrderHash)
+            dbOrder = await esDex.getOrder(listOrderHash)
             expect(dbOrder.order.maker).to.equal(owner.address)
             expect(await testERC721.ownerOf(0)).to.equal(esVault.address)
 
             const bidOrderHash = await testLibOrder.getOrderHash(bidOrder)
-            dbOrder2 = await esDex.orders(bidOrderHash)
+            dbOrder2 = await esDex.getOrder(bidOrderHash)
             expect(dbOrder2.order.maker).to.equal(owner.address)
         })
     })

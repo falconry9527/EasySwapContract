@@ -14,6 +14,7 @@ import {LibPayInfo} from "./libraries/LibPayInfo.sol";
 
 import {IEasySwapOrderBook} from "./interface/IEasySwapOrderBook.sol";
 import {IEasySwapVault} from "./interface/IEasySwapVault.sol";
+import {IOrderStorage} from "./interface/IOrderStorage.sol";
 
 import {OrderStorage} from "./OrderStorage.sol";
 import {OrderValidator} from "./OrderValidator.sol";
@@ -37,7 +38,6 @@ contract EasySwapOrderBook is
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
     PausableUpgradeable,
-    OrderStorage,
     ProtocolManager,
     OrderValidator
 {
@@ -80,12 +80,13 @@ contract EasySwapOrderBook is
     function initialize(
         uint128 newProtocolShare,  //  手续费
         address newVault, // EasySwapVault 钱包合约地址
+        address newOrderStorage, // OrderStorage 存储层地址
         string memory EIP712Name,
         string memory EIP712Version
     ) public initializer {
         __EasySwapOrderBook_init(
             newProtocolShare,
-            newVault,
+            newVault,newOrderStorage,
             EIP712Name,
             EIP712Version
         );
@@ -94,12 +95,13 @@ contract EasySwapOrderBook is
     function __EasySwapOrderBook_init(
         uint128 newProtocolShare,
         address newVault,
+        address newOrderStorage,
         string memory EIP712Name,
         string memory EIP712Version
     ) internal onlyInitializing {
         __EasySwapOrderBook_init_unchained(
             newProtocolShare,
-            newVault,
+            newVault,newOrderStorage,
             EIP712Name,
             EIP712Version
         );
@@ -108,6 +110,8 @@ contract EasySwapOrderBook is
     function __EasySwapOrderBook_init_unchained(
         uint128 newProtocolShare,
         address newVault,
+        address newOrderStorage,
+
         string memory EIP712Name,
         string memory EIP712Version
     ) internal onlyInitializing {
@@ -116,11 +120,13 @@ contract EasySwapOrderBook is
         __ReentrancyGuard_init();
         __Pausable_init();
 
-        OrderStorage.__OrderStorage_init();
+        // OrderStorage.__OrderStorage_init();
         ProtocolManager.__ProtocolManager_init(newProtocolShare);
         OrderValidator.__OrderValidator_init(EIP712Name, EIP712Version);
 
         setVault(newVault);
+        setOrderStorage(newOrderStorage);
+
     }
 
     modifier onlyDelegateCall() {
@@ -140,6 +146,12 @@ contract EasySwapOrderBook is
     function setVault(address newVault) public onlyOwner {
         require(newVault != address(0), "HD: zero address");
         _vault = newVault;
+    }
+    address private _orderStorage;
+
+    function setOrderStorage(address newOrderStorage) public onlyOwner {
+        require(newOrderStorage != address(0), "HD: zero address");
+        _orderStorage = newOrderStorage;
     }
 
     /**
@@ -230,7 +242,7 @@ contract EasySwapOrderBook is
                 );
             }
             // 把订单加入队列
-            _addOrder(order);
+            IOrderStorage(_orderStorage).addOrder(order);
 
             emit LogMake(
                 newOrderKey,
@@ -271,7 +283,7 @@ contract EasySwapOrderBook is
     function _cancelOrderTry(
         OrderKey orderKey
     ) internal returns (bool success) {
-        LibOrder.Order memory order = orders[orderKey].order;
+        LibOrder.Order memory order =  IOrderStorage(_orderStorage).getOrder(orderKey).order;
 
         if (
             order.maker == _msgSender() &&
@@ -279,7 +291,7 @@ contract EasySwapOrderBook is
         ) {
             OrderKey orderHash = LibOrder.hash(order);
             // 从 orders 移除 
-            _removeOrder(order);
+            IOrderStorage(_orderStorage).removeOrder(order);
             // withdraw asset from vault
             if (order.side == LibOrder.Side.List) {
                 // 取消卖出： 退回NFT
@@ -345,7 +357,7 @@ contract EasySwapOrderBook is
         OrderKey oldOrderKey,
         LibOrder.Order calldata newOrder
     ) internal returns (OrderKey newOrderKey, uint256 deltaBidPrice) {
-        LibOrder.Order memory oldOrder = orders[oldOrderKey].order;
+        LibOrder.Order memory oldOrder = IOrderStorage(_orderStorage).getOrder(oldOrderKey).order;
 
         // check order, only the price and amount can be modified
         if (
@@ -373,11 +385,11 @@ contract EasySwapOrderBook is
 
         // cancel old order
         uint256 oldFilledAmount = filledAmount[oldOrderKey];
-        _removeOrder(oldOrder); // remove order from order storage
+        IOrderStorage(_orderStorage).removeOrder(oldOrder); // remove order from order storage
         _cancelOrder(oldOrderKey); // cancel order from order book
         emit LogCancel(oldOrderKey, oldOrder.maker);
 
-        newOrderKey = _addOrder(newOrder); // add new order to order storage
+        newOrderKey = IOrderStorage(_orderStorage).addOrder(newOrder); // add new order to order storage
 
         // make new order
         if (oldOrder.side == LibOrder.Side.List) {
@@ -488,14 +500,14 @@ contract EasySwapOrderBook is
             // sell order
             // accept bid
             require(msgValue == 0, "HD: value > 0"); // sell order cannot accept eth
-            bool isSellExist = orders[sellOrderKey].order.maker != address(0); // check if sellOrder exist in order storage
+            bool isSellExist = IOrderStorage(_orderStorage).getOrder(sellOrderKey).order.maker != address(0); // check if sellOrder exist in order storage
             _validateOrder(sellOrder, isSellExist);
-            _validateOrder(orders[buyOrderKey].order, false); // check if exist in order storage
+            _validateOrder(IOrderStorage(_orderStorage).getOrder(buyOrderKey).order, false); // check if exist in order storage
 
             uint128 fillPrice = Price.unwrap(buyOrder.price); // the price of bid order
             if (isSellExist) {
                 // check if sellOrder exist in order storage , del&fill if exist
-                _removeOrder(sellOrder);
+                IOrderStorage(_orderStorage).removeOrder(sellOrder);
                 _updateFilledAmount(sellOrder.nft.amount, sellOrderKey); // sell order totally filled
             }
             _updateFilledAmount(filledAmount[buyOrderKey] + 1, buyOrderKey);
@@ -534,8 +546,8 @@ contract EasySwapOrderBook is
         } else if (_msgSender() == buyOrder.maker) {
             // buy order
             // accept list
-            bool isBuyExist = orders[buyOrderKey].order.maker != address(0);
-            _validateOrder(orders[sellOrderKey].order, false); // check if exist in order storage
+            bool isBuyExist = IOrderStorage(_orderStorage).getOrder(buyOrderKey).order.maker != address(0);
+            _validateOrder(IOrderStorage(_orderStorage).getOrder(sellOrderKey).order, false); // check if exist in order storage
             _validateOrder(buyOrder, isBuyExist);
 
             uint128 buyPrice = Price.unwrap(buyOrder.price);
@@ -550,7 +562,7 @@ contract EasySwapOrderBook is
                     address(this)
                 );
                 // check if buyOrder exist in order storage , del&fill if exist
-                _removeOrder(buyOrder);
+                IOrderStorage(_orderStorage).removeOrder(buyOrder);
                 _updateFilledAmount(filledAmount[buyOrderKey] + 1, buyOrderKey);
             }
             _updateFilledAmount(sellOrder.nft.amount, sellOrderKey);

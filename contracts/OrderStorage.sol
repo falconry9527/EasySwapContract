@@ -4,11 +4,36 @@ pragma solidity ^0.8.19;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {RedBlackTreeLibrary, Price} from "./libraries/RedBlackTreeLibrary.sol";
 import {LibOrder, OrderKey} from "./libraries/LibOrder.sol";
+import {IOrderStorage} from "./interface/IOrderStorage.sol";
 
 error CannotInsertDuplicateOrder(OrderKey orderKey);
 
 // 数据存储层一般不支持升级
-contract OrderStorage is Initializable {
+contract OrderStorage is Initializable,IOrderStorage {
+    address public owner;
+
+    // 构造函数：部署时设置所有者
+    constructor() {
+        owner = msg.sender;
+    }
+
+    // 自定义修饰器：仅允许所有者调用
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Only owner can call this");
+        _; // 继续执行函数逻辑
+    }
+
+    address public orderBook;
+    modifier onlyEasySwapOrderBook() {
+        require(msg.sender == orderBook, "HV: only EasySwap OrderBook");
+        _;
+    }
+    
+    function setOrderBook(address newOrderBook) public onlyOwner {
+        require(newOrderBook != address(0), "HV: zero address");
+        orderBook = newOrderBook;
+    }
+
     using RedBlackTreeLibrary for RedBlackTreeLibrary.Tree;
 
     /// @dev all order keys are wrapped in a sentinel value to avoid collisions
@@ -36,37 +61,15 @@ contract OrderStorage is Initializable {
         }
     }
 
-    function getBestPrice(
-        address collection,
-        LibOrder.Side side
-    ) public view returns (Price price) {
-        price = (side == LibOrder.Side.Bid)
-            ? priceTrees[collection][side].last()
-            : priceTrees[collection][side].first();
-
+    function getOrder(
+       OrderKey orderKey
+    ) external view onlyEasySwapOrderBook returns (LibOrder.DBOrder memory orderDb) {
+      return orders[orderKey] ;
     }
 
-    function getNextBestPrice(
-        address collection,
-        LibOrder.Side side,
-        Price price
-    ) public view returns (Price nextBestPrice) {
-        if (RedBlackTreeLibrary.isEmpty(price)) {
-            nextBestPrice = (side == LibOrder.Side.Bid)
-                ? priceTrees[collection][side].last()
-                : priceTrees[collection][side].first();
-        } else {
-            nextBestPrice = (side == LibOrder.Side.Bid)
-                ? priceTrees[collection][side].prev(price)
-                : priceTrees[collection][side].next(price);
-           // 买入 Bid：找更低的价格
-           // 卖出 list：找更高的价格
-        }
-    }
-
-    function _addOrder(
+    function addOrder(
         LibOrder.Order memory order
-    ) internal returns (OrderKey orderKey) {
+    ) external  onlyEasySwapOrderBook returns (OrderKey orderKey) {
         // 获取订单的hash值
         orderKey = LibOrder.hash(order);
         //  判断订单是否已经存在
@@ -116,9 +119,9 @@ contract OrderStorage is Initializable {
         }
     }
 
-    function _removeOrder(
+    function removeOrder(
         LibOrder.Order memory order
-    ) internal returns (OrderKey orderKey) {
+    ) external  onlyEasySwapOrderBook returns (OrderKey orderKey) {
         LibOrder.OrderQueue storage orderQueue = orderQueues[order.nft.collection][order.side][order.price];
         orderKey = orderQueue.head;
         OrderKey prevOrderKey  = LibOrder.ORDERKEY_SENTINEL;
@@ -171,151 +174,4 @@ contract OrderStorage is Initializable {
         }
     }
 
-    /**
-     * @dev Retrieves a list of orders that match the specified criteria.
-     * @param collection The address of the NFT collection.
-     * @param tokenId The ID of the NFT.
-     * @param side The side of the orders to retrieve (buy or sell).
-     * @param saleKind The type of sale (fixed price or auction).
-     * @param count The maximum number of orders to retrieve.
-     * @param price The maximum price of the orders to retrieve.
-     */
-    function getOrders(
-        address collection,
-        uint256 tokenId,
-        LibOrder.Side side,
-        LibOrder.SaleKind saleKind,
-        uint256 count,
-        Price price
-        // OrderKey firstOrderKey
-    )
-        external
-        view
-        returns (LibOrder.Order[] memory resultOrders, OrderKey nextOrderKey)
-    {
-        resultOrders = new LibOrder.Order[](count);
-
-        if (RedBlackTreeLibrary.isEmpty(price)) {
-            // 没有给出价格，就找出最低 和 最高价格
-            price = getBestPrice(collection, side);
-        } else {
-            price = getNextBestPrice(collection, side, price);
-
-        }
-
-        uint256 i;
-        while (RedBlackTreeLibrary.isNotEmpty(price) && i < count) {
-            // 循环遍历所有价格 price ，直到没有数据
-            LibOrder.OrderQueue memory orderQueue = orderQueues[collection][side][price];
-            OrderKey orderKey = orderQueue.head;
-            while (LibOrder.isNotSentinel(orderKey)) {
-                LibOrder.DBOrder memory order = orders[orderKey];
-                orderKey = order.next;
-            }
-       
-            while (LibOrder.isNotSentinel(orderKey) && i < count) {
-                LibOrder.DBOrder memory dbOrder = orders[orderKey];
-                orderKey = dbOrder.next;
-                if (
-                    (dbOrder.order.expiry != 0 &&
-                        dbOrder.order.expiry < block.timestamp)
-                ) {
-                    continue;
-                }
-
-                if (
-                    (side == LibOrder.Side.Bid) &&
-                    (saleKind == LibOrder.SaleKind.FixedPriceForCollection)
-                ) {
-                    if (
-                        (dbOrder.order.side == LibOrder.Side.Bid) &&
-                        (dbOrder.order.saleKind ==
-                            LibOrder.SaleKind.FixedPriceForItem)
-                    ) {
-                        continue;
-                    }
-                }
-
-                if (
-                    (side == LibOrder.Side.Bid) &&
-                    (saleKind == LibOrder.SaleKind.FixedPriceForItem)
-                ) {
-                    if (
-                        (dbOrder.order.side == LibOrder.Side.Bid) &&
-                        (dbOrder.order.saleKind ==
-                            LibOrder.SaleKind.FixedPriceForItem) &&
-                        (tokenId != dbOrder.order.nft.tokenId)
-                    ) {
-                        continue;
-                    }
-                }
-
-                resultOrders[i] = dbOrder.order;
-                nextOrderKey = dbOrder.next;
-                i = onePlus(i);
-            }
-            price = getNextBestPrice(collection, side, price);
-        }
-    }
-
-    function getBestOrder(
-        address collection,
-        uint256 tokenId,
-        LibOrder.Side side,
-        LibOrder.SaleKind saleKind
-    ) external view returns (LibOrder.Order memory orderResult) {
-        Price price = getBestPrice(collection, side);
-        while (RedBlackTreeLibrary.isNotEmpty(price)) {
-            LibOrder.OrderQueue memory orderQueue = orderQueues[collection][
-                side
-            ][price];
-            OrderKey orderKey = orderQueue.head;
-            while (LibOrder.isNotSentinel(orderKey)) {
-                LibOrder.DBOrder memory dbOrder = orders[orderKey];
-                if (
-                    (side == LibOrder.Side.Bid) &&
-                    (saleKind == LibOrder.SaleKind.FixedPriceForItem)
-                ) {
-                    if (
-                        (dbOrder.order.side == LibOrder.Side.Bid) &&
-                        (dbOrder.order.saleKind ==
-                            LibOrder.SaleKind.FixedPriceForItem) &&
-                        (tokenId != dbOrder.order.nft.tokenId)
-                    ) {
-                        orderKey = dbOrder.next;
-                        continue;
-                    }
-                }
-
-                if (
-                    (side == LibOrder.Side.Bid) &&
-                    (saleKind == LibOrder.SaleKind.FixedPriceForCollection)
-                ) {
-                    if (
-                        (dbOrder.order.side == LibOrder.Side.Bid) &&
-                        (dbOrder.order.saleKind ==
-                            LibOrder.SaleKind.FixedPriceForItem)
-                    ) {
-                        orderKey = dbOrder.next;
-                        continue;
-                    }
-                }
-
-                if (
-                    (dbOrder.order.expiry == 0 ||
-                        dbOrder.order.expiry > block.timestamp)
-                ) {
-                    orderResult = dbOrder.order;
-                    break;
-                }
-                orderKey = dbOrder.next;
-            }
-            if (Price.unwrap(orderResult.price) > 0) {
-                break;
-            }
-            price = getNextBestPrice(collection, side, price);
-        }
-    }
-
-    uint256[50] private __gap;
 }
