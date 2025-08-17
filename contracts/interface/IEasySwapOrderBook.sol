@@ -58,4 +58,9 @@ interface IEasySwapOrderBook {
     function matchOrders(
         LibOrder.MatchDetail[] calldata matchDetails
     ) external payable returns (bool[] memory successes);
+
+    function getOrder(
+       OrderKey orderKey
+    ) external  view returns (LibOrder.DBOrder memory orderDb) ;
+
 }

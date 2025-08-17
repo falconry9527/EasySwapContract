@@ -430,6 +430,12 @@ contract EasySwapOrderBook is
             newOrder.salt
         );
     }
+    
+    function getOrder(
+       OrderKey orderKey
+    )  external view  override returns (LibOrder.DBOrder memory orderDb) {
+      return  IOrderStorage(_orderStorage).getOrder(orderKey) ;
+    }
 
     function matchOrders(
         LibOrder.MatchDetail[] calldata matchDetails
@@ -593,6 +599,8 @@ contract EasySwapOrderBook is
             revert("HD: sender invalid");
         }
     }
+
+
 
     /**
      * @notice caculate amount based on share.
