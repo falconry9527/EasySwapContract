@@ -21,7 +21,6 @@ async function main() {
   console.log("esDex deployed to:",esDexAddress);
 
   // 3. 部署 setOrderBook 
-  await esVault.setOrderBook(esDexAddress)
   const tx = await esVault.setOrderBook(esDexAddress)
   console.log("esVault setOrderBook tx:", tx.hash)
 
