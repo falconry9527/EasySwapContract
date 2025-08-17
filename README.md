@@ -22,8 +22,8 @@ npx hardhat run scripts/deploy.js --network sepolia
 ```shell
 npm cache clean --force
 npx hardhat clean && npx hardhat compile
-npx hardhat test
-
+npx hardhat test test/testEasySwap_make.js 
+npx hardhat test test/testEasySwap_match.js 
 ```
 
 
