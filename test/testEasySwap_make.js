@@ -51,7 +51,8 @@ describe("EasySwap Test", function () {
         testERC721.setApprovalForAll(esVault.address, true)
         // testERC721.setApprovalForAll(esDex.address, true)
 
-        await esVault.setOrderBook(esDex.address)
+        tx= await esVault.setOrderBook(await esDex.address)
+        console.log("esVault setOrderBook tx:", await tx.hash)
 
         console.log("============init=========== ")
 

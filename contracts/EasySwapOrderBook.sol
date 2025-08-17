@@ -71,7 +71,7 @@ contract EasySwapOrderBook is
     /**
      * @notice Initialize contracts.
      * @param newProtocolShare Default protocol fee : 手续费
-     * @param newVault easy swap vault address : 存储层合约地址
+     * @param newVault easy swap vault address :  EasySwapVault 钱包合约地址
      * EasySwapVault ： 是数据存储层，逻辑和数据存储隔离开：数据存储不能升级，因为每次升级就相当于一个新的合约，存储的数据就丢失了
      *  EIP712Name  : 合约名称
      *  EIP712Version  ：合约版本
@@ -144,7 +144,7 @@ contract EasySwapOrderBook is
 
     /**
      *
-     *  下单： 卖出NFT
+     *  下单： 卖出NFT / 买入NFT
      * @notice Create multiple orders and transfer related assets.
      * @dev If Side=List, you need to authorize the EasySwapOrderBook contract first (creating a List order will transfer the NFT to the order pool).
      * @dev If Side=Bid, you need to pass {value}: the price of the bid (similarly, creating a Bid order will transfer ETH to the order pool).

@@ -15,9 +15,6 @@ if (!SEPOLIA_PK_ONE) {
   throw new Error("Please set at least one private key in a .env file")
 }
 
-// const MAINNET_PK = process.env.MAINNET_PK
-// const MAINNET_ALCHEMY_AK = process.env.MAINNET_ALCHEMY_AK
-
 const SEPOLIA_ALCHEMY_AK = process.env.SEPOLIA_ALCHEMY_AK
 if (!SEPOLIA_ALCHEMY_AK) {
   throw new Error("Please set your SEPOLIA_ALCHEMY_AK in a .env file")

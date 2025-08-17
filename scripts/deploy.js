@@ -1,22 +1,35 @@
-const { ethers, upgrades } = require("hardhat")
+// scripts/deploy.js
+const { ethers, upgrades } = require("hardhat");
 
 async function main() {
-  const [deployer] = await ethers.getSigners()
-  console.log("deployer: ", deployer.address)
+  const [owner] = await ethers.getSigners()
+  console.log("owner: ", owner.address)
 
-  esDexAddress = "0xcEE5AA84032D4a53a0F9d2c33F36701c3eAD5895"
-  esVaultAddress = "0xaD65f3dEac0Fa9Af4eeDC96E95574AEaba6A2834"
-  const esVault = await (
-    await ethers.getContractFactory("EasySwapVault")
-  ).attach(esVaultAddress)
-  tx = await esVault.setOrderBook(esDexAddress)
-  await tx.wait()
+  // 1. 部署 EasySwapVault
+  esVault = await ethers.getContractFactory("EasySwapVault")
+  esVault = await upgrades.deployProxy(esVault, { initializer: 'initialize' });
+  const esVaultAddress = await esVault.address;
+  console.log("esVault deployed to:", esVaultAddress);
+
+  // 2. 部署 EasySwapOrderBook 
+  let esDex = await ethers.getContractFactory("EasySwapOrderBook")
+  newProtocolShare = 200;
+  EIP712Name = "EasySwapOrderBook"
+  EIP712Version = "1"
+  esDex = await upgrades.deployProxy(esDex, [newProtocolShare, esVaultAddress, EIP712Name, EIP712Version],{initializer: 'initialize' });
+  esDexAddress = await esDex.address;
+  console.log("esDex deployed to:",esDexAddress);
+
+  // 3. 部署 setOrderBook 
+  await esVault.setOrderBook(esDexAddress)
+  const tx = await esVault.setOrderBook(esDexAddress)
   console.log("esVault setOrderBook tx:", tx.hash)
+
 }
 
 main()
   .then(() => process.exit(0))
   .catch((error) => {
-    console.error(error)
-    process.exit(1)
-  })
+    console.error(error);
+    process.exit(1);
+  });

@@ -11,10 +11,13 @@ npx hardhat ignition deploy ./ignition/modules/Lock.js
 ```
 # EasySwapContract
 
-部署脚本
+链上部署脚本
 ```shell
-npx hardhat run scripts/deploy_721.js --network sepolia
-npx hardhat run scripts/deploy.js --network sepolia
+1. 部署 EasySwapVault 和 EasySwapOrderBook
+npx hardhat run scripts/deploy.js  --network sepolia
+
+2. 关联两个合约
+npx hardhat run scripts/deploy_setbook.js  --network sepolia
 
 ```
 
@@ -52,7 +55,7 @@ NFTBalance：用户nft余额
 depositETH : 存入NFT
 withdrawNFT :  取出NFT
 
----OrderValidator: 订单存储层
+---OrderValidator: 订单验证器
 // 订单号 -> 订单金额 ：CANCELLED 为 已经取消
 mapping(OrderKey => uint256) public filledAmount;
 
