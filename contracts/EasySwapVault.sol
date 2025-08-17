@@ -60,6 +60,7 @@ contract EasySwapVault is IEasySwapVault, OwnableUpgradeable {
         address collection,
         uint256 tokenId
     ) external onlyEasySwapOrderBook {
+        require(IERC721(collection).ownerOf(tokenId) == from , "NFT not transferable");
         IERC721(collection).safeTransferNFT(from, address(this), tokenId);
         NFTBalance[orderKey] = tokenId;
     }

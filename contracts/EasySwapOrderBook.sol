@@ -78,8 +78,8 @@ contract EasySwapOrderBook is
      * 
      */
     function initialize(
-        uint128 newProtocolShare,
-        address newVault,
+        uint128 newProtocolShare,  //  手续费
+        address newVault, // EasySwapVault 钱包合约地址
         string memory EIP712Name,
         string memory EIP712Version
     ) public initializer {
@@ -185,7 +185,7 @@ contract EasySwapOrderBook is
         }
         if (msg.value > ethAmount) {
             // return the remaining eth，if the eth is not enough, the transaction will be reverted
-            // msg.valu :  是 用户传过来的 金额 
+            // msg.value :  是 用户传过来的 金额 
             // ETHAmount : 是 算出的价格
             _msgSender().safeTransferETH(msg.value - ethAmount);
         }
