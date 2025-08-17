@@ -52,6 +52,10 @@ contract EasySwapVault is IEasySwapVault, OwnableUpgradeable {
     ) external onlyEasySwapOrderBook {
         ETHBalance[orderKey] -= ETHAmount;
         to.safeTransferETH(ETHAmount);
+        //  using LibTransferSafeUpgradeable for address; 
+        // 把方法赋予 address，原始方法如下
+        // payable(to).transfer(ETHAmount) ;
+
     }
 
     function depositNFT(
@@ -73,7 +77,6 @@ contract EasySwapVault is IEasySwapVault, OwnableUpgradeable {
     ) external onlyEasySwapOrderBook {
         require(NFTBalance[orderKey] == tokenId, "HV: not match tokenId");
         delete NFTBalance[orderKey];
-
         IERC721(collection).safeTransferNFT(address(this), to, tokenId);
     }
 
