@@ -44,7 +44,7 @@ describe("EasySwap Test", function () {
         esDex = await upgrades.deployProxy(esDex, [newProtocolShare, esVault.address, EIP712Name, EIP712Version], 
             {initializer: 'initialize' });
         // await esDex.waitForDeployment();
-        // console.log("esDex deployed to:", await esDex.address);
+        console.log("esDex deployed to:", await esDex.address);
         for (let i = 0; i < 10; i++) {
            await testERC721.mint(owner.address, i );
         }

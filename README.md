@@ -25,7 +25,7 @@ npx hardhat run scripts/deploy_setbook.js  --network sepolia
 ```shell
 npm cache clean --force
 npx hardhat clean && npx hardhat compile
-npx hardhat test test/testEasySwap_make.js 
+npx hardhat test test/testEasySwap_make.js   --network sepolia
 npx hardhat test test/testEasySwap_match.js 
 ```
 

@@ -485,8 +485,7 @@ contract EasySwapOrderBook is
         _isMatchAvailable(sellOrder, buyOrder, sellOrderKey, buyOrderKey);
 
         if (_msgSender() == sellOrder.maker) {
-            // sell order
-            // accept bid
+            // 卖家卖出（以前挂的卖单）
             require(msgValue == 0, "HD: value > 0"); // sell order cannot accept eth
             bool isSellExist = orders[sellOrderKey].order.maker != address(0); // check if sellOrder exist in order storage
             _validateOrder(sellOrder, isSellExist);
@@ -532,8 +531,7 @@ contract EasySwapOrderBook is
                 );
             }
         } else if (_msgSender() == buyOrder.maker) {
-            // buy order
-            // accept list
+            // 买家卖出（以前挂的买单）
             bool isBuyExist = orders[buyOrderKey].order.maker != address(0);
             _validateOrder(orders[sellOrderKey].order, false); // check if exist in order storage
             _validateOrder(buyOrder, isBuyExist);
