@@ -59,7 +59,7 @@ withdrawNFT :  取出NFT
 // 订单号 -> 订单金额 ：CANCELLED 为 已经取消
 mapping(OrderKey => uint256) public filledAmount;
 
----ProtocolManager: 匹配订单的工具类
+---ProtocolManager: 管理协议费
 protocolShare :
 
 
