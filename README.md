@@ -60,7 +60,7 @@ withdrawNFT :  取出NFT
 mapping(OrderKey => uint256) public filledAmount;
 
 ---ProtocolManager: 管理协议费
-protocolShare :
+protocolShare : 手续费
 
 
 ```

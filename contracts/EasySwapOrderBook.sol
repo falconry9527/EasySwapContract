@@ -562,7 +562,7 @@ contract EasySwapOrderBook is
             );
 
             // transfer nft&eth
-            uint128 protocolFee = _shareToAmount(fillPrice, protocolShare);
+            uint128 protocolFee = _shareToAmount(fillPrice, ProtocolManager.protocolShare);
             sellOrder.maker.safeTransferETH(fillPrice - protocolFee);
             if (buyPrice > fillPrice) {
                 buyOrder.maker.safeTransferETH(buyPrice - fillPrice);
