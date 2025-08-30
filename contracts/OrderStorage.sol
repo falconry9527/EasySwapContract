@@ -9,22 +9,23 @@ error CannotInsertDuplicateOrder(OrderKey orderKey);
 
 // 数据存储层一般不支持升级
 contract OrderStorage is Initializable {
+    // 把 RedBlackTreeLibrary 的方法赋予 Tree 结构体使用
     using RedBlackTreeLibrary for RedBlackTreeLibrary.Tree;
+
+    /// @dev price tree for each collection and side, sorted by price
+    // nft collection address->（买入/卖出 -> 价格树 Tree）
+    // 价格树：只保留是否有有某个价格，没有保存具体订单
+    mapping(address => mapping(LibOrder.Side => RedBlackTreeLibrary.Tree)) public priceTrees;
+
+    /// @dev order queue for each collection, side and expecially price, sorted by orderKey
+    // nft collection address->（买入/卖出 -> （价格->订单队列) ） 
+    // 订单队列 只保留 head 和 tail 两个订单 ， 全量订单在 orders 保存
+    mapping(address => mapping(LibOrder.Side => mapping(Price => LibOrder.OrderQueue))) public orderQueues;
 
     /// @dev all order keys are wrapped in a sentinel value to avoid collisions
     // OrderKey->LibOrder.DBOrder(包含下一个订单的  OrderKey next)
     // orders : 包含所有价格都订单，每个价格是一条链 
     mapping(OrderKey => LibOrder.DBOrder) public orders;
-
-    /// @dev price tree for each collection and side, sorted by price
-    // nft address->（买入/卖出 -> 价格树 Tree）
-    // 价格树：只保留是否有有某个价格，没有保存具体订单
-    mapping(address => mapping(LibOrder.Side => RedBlackTreeLibrary.Tree)) public priceTrees;
-
-    /// @dev order queue for each collection, side and expecially price, sorted by orderKey
-    // nft address->（买入/卖出 -> （价格->订单队列) ） 
-    // 订单队列 只保留 head 和 tail 两个订单 ， 全量订单在 orders 保存
-    mapping(address => mapping(LibOrder.Side => mapping(Price => LibOrder.OrderQueue))) public orderQueues;
 
     function __OrderStorage_init() internal onlyInitializing {}
 
@@ -69,8 +70,8 @@ contract OrderStorage is Initializable {
     ) internal returns (OrderKey orderKey) {
         // 获取订单的hash值
         orderKey = LibOrder.hash(order);
-        //  判断订单是否已经存在
         if (orders[orderKey].order.maker != address(0)) {
+            // 如果订单已存在，就直接报错退出
             revert CannotInsertDuplicateOrder(orderKey);
         }
 
@@ -94,14 +95,14 @@ contract OrderStorage is Initializable {
             orderQueue = orderQueues[order.nft.collection][order.side][order.price];
         }
         if (LibOrder.isSentinel(orderQueue.tail)) { // 队列是否为空
-            // 更新队列
-            orderQueue.head = orderKey;
-            orderQueue.tail = orderKey;
             // 更新orders
             orders[orderKey] = LibOrder.DBOrder( // 创建新的订单，插入队列， 下一个订单为sentinel
                 order,
                 LibOrder.ORDERKEY_SENTINEL
             );
+            // 更新队列
+            orderQueue.head = orderKey;
+            orderQueue.tail = orderKey;
         } else { // 队列不为空
             // 更新 orders
             // 上一个 order（orderQueue.tail） 的 next= orderKey
@@ -138,14 +139,21 @@ contract OrderStorage is Initializable {
                 // emit OrderRemoved(order.nft.collection, orderKey, order.maker, order.side, order.price, order.nft, block.timestamp);
                 // ====== 更新 orderQueue 
                 if (OrderKey.unwrap(orderQueue.head) ==OrderKey.unwrap(orderKey)) {
+                    // 如果移除的是第一个订单
+                    // orderQueue 只会在移除第一个 和 最后一个订单的时候发生修改
                     orderQueue.head = dbOrder.next;
-                } else {
-                    // orders 开头不要修改，开头之后需要修改
-                    orders[prevOrderKey].next = dbOrder.next;
-                }
+                } 
                 if (OrderKey.unwrap(orderQueue.tail) ==OrderKey.unwrap(orderKey)) {
+                    // 如果移除的是最后一个订单
+                   // orderQueue 只会在移除第一个 和 最后一个订单的时候发生修改
                     orderQueue.tail = prevOrderKey;
                 }
+                if (OrderKey.unwrap(orderQueue.head) !=OrderKey.unwrap(orderKey)) {
+                    // 如果移除的不是第一个订单
+                    // orders 只会在第二个订单之后发生修改
+                    orders[prevOrderKey].next = dbOrder.next;
+                }
+    
                 // 移动到下一个订单
                 prevOrderKey = orderKey;
                 orderKey = dbOrder.next;

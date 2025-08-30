@@ -9,15 +9,17 @@ contract kənˈtrækt
 4.cancelOrders : 取消订单
 
 --- OrderStorage : 数据存储层
-// (订单key-> 订单的详细信息)
-mapping(OrderKey => LibOrder.DBOrder) public orders;
-
 // 买入和卖出的价格排序
-// 买入/卖出 -> 价格树
+//           买入/卖出 -> 价格树
 mapping(address => mapping(LibOrder.Side => RedBlackTreeLibrary.Tree)) public priceTrees;
 
-// 订单队列： 买入/卖出 -> （价格-> 价格队列）
+// 订单队列：  买入/卖出 -> 价格 -> 价格队列
 mapping(address => mapping(LibOrder.Side => mapping(Price => LibOrder.OrderQueue))) public orderQueues;
+
+// (订单key-> 订单的详细信息): 
+1. 每个订单根据 LibOrder.DBOrder.next形成一个链条
+2. 每个不同价格 一个不同的链条，使用 orderQueues 记录head 和 tail 的 orderkey
+mapping(OrderKey => LibOrder.DBOrder) public orders;
 
 --- EasySwapVault （vɔːlt） : 钱包和转账层
 ETHBalance：用户eth余额
@@ -112,6 +114,7 @@ open zeppelin(ˈzepəlɪn)
 Re entrance Guard  Upgrade able
  (ɪnˈtræns  ɡɑːrd  ˈʌpɡreɪd)
 4. 多签: 提取手续费需要多签
+5. 合约升级的时候，不能修改 状态变量的顺序，否则状态变量的数据存储会乱
 ```
 
 # 双花攻击

@@ -191,6 +191,7 @@ contract EasySwapOrderBook is
         }
     }
 
+
     function _makeOrderTry(
         LibOrder.Order calldata order,
         uint128 ETHAmount
@@ -219,7 +220,7 @@ contract EasySwapOrderBook is
                     order.nft.tokenId
                 );
             } else if (order.side == LibOrder.Side.Bid) {
-                // 买入 NFT ，先把ETH 转进来
+                // 买单 ，先把ETH 转进来
                 if (order.nft.amount == 0) {
                     return LibOrder.ORDERKEY_SENTINEL;
                 }
@@ -229,7 +230,7 @@ contract EasySwapOrderBook is
                 );
             }
             // 把订单加入队列
-            _addOrder(order);
+            OrderStorage._addOrder(order);
 
             emit LogMake(
                 newOrderKey,
@@ -267,15 +268,16 @@ contract EasySwapOrderBook is
         }
     }
 
+    /**
+     * 移除订单，并回退金额
+     */
     function _cancelOrderTry(
         OrderKey orderKey
     ) internal returns (bool success) {
         LibOrder.Order memory order = orders[orderKey].order;
 
-        if (
-            order.maker == _msgSender() &&
-            filledAmount[orderKey] < order.nft.amount // only unfilled order can be canceled
-        ) {
+        if (order.maker == _msgSender() &&filledAmount[orderKey] < order.nft.amount) {
+            // only unfilled order can be canceled
             OrderKey orderHash = LibOrder.hash(order);
             // 从 orders 移除 
             _removeOrder(order);
@@ -290,15 +292,14 @@ contract EasySwapOrderBook is
                 );
             } else if (order.side == LibOrder.Side.Bid) {
                 // 取消买入： 退回ETH
-                uint256 availNFTAmount = order.nft.amount -
-                    filledAmount[orderKey];
+                uint256 availNFTAmount = order.nft.amount -filledAmount[orderKey];
                 IEasySwapVault(_vault).withdrawETH(
                     orderHash,
                     Price.unwrap(order.price) * availNFTAmount, // the withdraw amount of eth
                     order.maker
                 );
             }
-            _cancelOrder(orderKey);
+            OrderValidator._cancelOrder(orderKey);
             success = true;
             emit LogCancel(orderKey, order.maker);
         } else {
@@ -340,6 +341,9 @@ contract EasySwapOrderBook is
         }
     }
 
+    /**
+     * 先取消订单，再重新生成订单
+     */
     function _editOrderTry(
         OrderKey oldOrderKey,
         LibOrder.Order calldata newOrder
@@ -373,10 +377,10 @@ contract EasySwapOrderBook is
         // cancel old order
         uint256 oldFilledAmount = filledAmount[oldOrderKey];
         _removeOrder(oldOrder); // remove order from order storage
-        _cancelOrder(oldOrderKey); // cancel order from order book
+        OrderValidator._cancelOrder(oldOrderKey); // cancel order from order book
         emit LogCancel(oldOrderKey, oldOrder.maker);
 
-        newOrderKey = _addOrder(newOrder); // add new order to order storage
+        newOrderKey = OrderStorage._addOrder(newOrder); // add new order to order storage
 
         // make new order
         if (oldOrder.side == LibOrder.Side.List) {
@@ -455,6 +459,7 @@ contract EasySwapOrderBook is
 
         if (msg.value > buyETHAmount) {
             // return the remaining eth
+            // 由于部分订单不会成功，所以需要返还多余的eth
             _msgSender().safeTransferETH(msg.value - buyETHAmount);
         }
     }
@@ -491,20 +496,20 @@ contract EasySwapOrderBook is
             // isSellExist，是否跳过过期时间检查
             //外部订单： 订单不存在orders，isSellExist=false，不跳过过期时间检查
             //内部订单： 订单存在orders，isSellExist=true，跳过过期时间检查（直接购买，所以跳过）
-            _validateOrder(sellOrder, isSellExist);
+            OrderValidator._validateOrder(sellOrder, isSellExist);
 
             // 检查买单在不在订单表，如果不在就终止交易（不跳过过期时间检查）
-            _validateOrder(orders[buyOrderKey].order, false); // check if exist in order storage
+            OrderValidator._validateOrder(orders[buyOrderKey].order, false); // check if exist in order storage
 
             uint128 fillPrice = Price.unwrap(buyOrder.price); // the price of bid order
             if (isSellExist) {
                 // 移除订单
                 _removeOrder(sellOrder);
                 // 更新卖单金额
-                _updateFilledAmount(sellOrder.nft.amount, sellOrderKey); // sell order totally filled
+                OrderValidator._updateFilledAmount(sellOrder.nft.amount, sellOrderKey); // sell order totally filled
             }
             // 更新买单金额
-            _updateFilledAmount(filledAmount[buyOrderKey] + 1, buyOrderKey);
+            OrderValidator._updateFilledAmount(filledAmount[buyOrderKey] + 1, buyOrderKey);
             emit LogMatch(
                 sellOrderKey,
                 buyOrderKey,
@@ -541,8 +546,8 @@ contract EasySwapOrderBook is
         } else if (_msgSender() == buyOrder.maker) {
             // 买家卖出（以前挂的买单）
             bool isBuyExist = orders[buyOrderKey].order.maker != address(0);
-            _validateOrder(orders[sellOrderKey].order, false); // check if exist in order storage
-            _validateOrder(buyOrder, isBuyExist);
+            OrderValidator._validateOrder(orders[sellOrderKey].order, false); // check if exist in order storage
+            OrderValidator._validateOrder(buyOrder, isBuyExist);
 
             uint128 buyPrice = Price.unwrap(buyOrder.price);
             uint128 fillPrice = Price.unwrap(sellOrder.price);
@@ -557,9 +562,9 @@ contract EasySwapOrderBook is
                 );
                 // check if buyOrder exist in order storage , del&fill if exist
                 _removeOrder(buyOrder);
-                _updateFilledAmount(filledAmount[buyOrderKey] + 1, buyOrderKey);
+                OrderValidator._updateFilledAmount(filledAmount[buyOrderKey] + 1, buyOrderKey);
             }
-            _updateFilledAmount(sellOrder.nft.amount, sellOrderKey);
+            OrderValidator._updateFilledAmount(sellOrder.nft.amount, sellOrderKey);
 
             emit LogMatch(
                 buyOrderKey,
@@ -627,8 +632,7 @@ contract EasySwapOrderBook is
             "HD: asset mismatch"
         );
         require(
-            filledAmount[sellOrderKey] < sellOrder.nft.amount &&
-                filledAmount[buyOrderKey] < buyOrder.nft.amount,
+            filledAmount[sellOrderKey] < sellOrder.nft.amount && filledAmount[buyOrderKey] < buyOrder.nft.amount,
             "HD: order closed"
         );
     }
