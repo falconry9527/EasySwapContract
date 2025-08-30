@@ -88,7 +88,7 @@ Stack 特例 ：
 ```
 透明代理(Transparent Proxy（ˈprɑːksi）)
 UUPS代理(Universal Upgradeable Proxy Standard)
-升级逻辑的位置：透明代理将升级逻辑放在代理合约（Proxy Contract）中，而UUPS代理将升级逻辑内置在逻辑合约（Logic Contract）中。
+升级逻辑的位置：透明代理将升级逻辑放在代理合约（Proxy Contract）中，而UUPS代理将升级逻辑(logic ) 内置在 实现合约（Implemented Contract）中。
 
 ```
 
@@ -107,9 +107,25 @@ UUPS代理(Universal Upgradeable Proxy Standard)
 ```
 1. 卖家先存入 nft，买家先存入eth
 2. 接口限制，vault 合约只能被 orderbook 合约调用
+3. ReentrancyGuardUpgradeable ：防止提款重入攻击:  __ReentrancyGuard_init -> nonReentrant
+open zeppelin(ˈzepəlɪn)
+Re entrance Guard  Upgrade able
+ (ɪnˈtræns  ɡɑːrd  ˈʌpɡreɪd)
+4. 多签: 提取手续费需要多签
 ```
 
-# Redis缓存雪崩
+# 双花攻击
+```
+双花攻击（Double-Spend Attack） 指的是攻击者试图将同一笔数字货币花费两次的恶意行为。
+分布式账本，共识机制，工作量证明，最长链原则
+Consensus Mechanism， Distributed Ledger，Proof-of-Work (PoW)，Longest Chain Rule
+
+挖矿就是争夺记账权
+Bitcoin mining is competing for the right to add a new block to the blockchain.
+
+```
+
+# Redis 缓存雪崩 （Cache Avalanche （ˈævəlæntʃ） ）
 ```
 大量缓存数据同时过期（失效） 或 Redis 缓存服务直接宕机
 

@@ -43,6 +43,7 @@ contract EasySwapVault is IEasySwapVault, OwnableUpgradeable {
     ) external payable onlyEasySwapOrderBook {
         require(msg.value >= ETHAmount, "HV: not match ETHAmount");
         ETHBalance[orderKey] += msg.value;
+        // 存入ETH ，合约什么也不用做，只用等着就好了
     }
 
     function withdrawETH(
@@ -50,8 +51,8 @@ contract EasySwapVault is IEasySwapVault, OwnableUpgradeable {
         uint256 ETHAmount,
         address to
     ) external onlyEasySwapOrderBook {
-        ETHBalance[orderKey] -= ETHAmount;
         to.safeTransferETH(ETHAmount);
+        ETHBalance[orderKey] -= ETHAmount;
         //  using LibTransferSafeUpgradeable for address; 
         // 把方法赋予 address，原始方法如下
         // payable(to).transfer(ETHAmount) ;

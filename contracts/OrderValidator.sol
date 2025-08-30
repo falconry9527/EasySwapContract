@@ -62,10 +62,12 @@ abstract contract OrderValidator is
 
         if (order.side == LibOrder.Side.List) {
             require(
+                // 卖家要有 nft地址
                 order.nft.collection != address(0),
                 "OVa: unsupported nft asset"
             );
         } else if (order.side == LibOrder.Side.Bid) {
+            // 买家 eth> 0
             require(Price.unwrap(order.price) > 0, "OVa: zero price");
         }
     }

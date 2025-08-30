@@ -72,7 +72,7 @@ contract EasySwapOrderBook is
      * @notice Initialize contracts.
      * @param newProtocolShare Default protocol fee : 手续费
      * @param newVault easy swap vault address :  EasySwapVault 钱包合约地址
-     * EasySwapVault ： 是数据存储层，逻辑和数据存储隔离开：数据存储不能升级，因为每次升级就相当于一个新的合约，存储的数据就丢失了
+     * EasySwapVault ： 是数据存储层，逻辑和数据存储隔离开
      *  EIP712Name  : 合约名称
      *  EIP712Version  ：合约版本
      * 
@@ -172,14 +172,14 @@ contract EasySwapOrderBook is
         for (uint256 i = 0; i < orderLength; ++i) {
             uint128 buyPrice; // the price of bid order
             if (newOrders[i].side == LibOrder.Side.Bid) {
-                // amount : 一般都是1  
+                 // 买单 计算总价
                 buyPrice =Price.unwrap(newOrders[i].price) * newOrders[i].nft.amount;
             }
             OrderKey newOrderKey = _makeOrderTry(newOrders[i], buyPrice);
+            // update  newOrderKeys
             newOrderKeys[i] = newOrderKey;
+
             if ( OrderKey.unwrap(newOrderKey) != OrderKey.unwrap(LibOrder.ORDERKEY_SENTINEL)) {
-                // newOrderKey != 1 
-                // byte32 转数字 
                 ethAmount += buyPrice;
             }
         }
@@ -189,7 +189,6 @@ contract EasySwapOrderBook is
             // ETHAmount : 是 算出的价格
             _msgSender().safeTransferETH(msg.value - ethAmount);
         }
-        // 如果资金不够怎么搞 ？？？？？
     }
 
     function _makeOrderTry(
@@ -205,7 +204,7 @@ contract EasySwapOrderBook is
             filledAmount[LibOrder.hash(order)] == 0 // order cannot be canceled or filled
         ) {
             newOrderKey = LibOrder.hash(order);
-
+            // newOrderKey depends on : collection,tokenId,amount
             // deposit asset to vault
             if (order.side == LibOrder.Side.List) {
                 // 卖出 NFT ,先把 NFT 转进来
@@ -220,7 +219,7 @@ contract EasySwapOrderBook is
                     order.nft.tokenId
                 );
             } else if (order.side == LibOrder.Side.Bid) {
-                // 买入 NFT ，先把钱转进来
+                // 买入 NFT ，先把ETH 转进来
                 if (order.nft.amount == 0) {
                     return LibOrder.ORDERKEY_SENTINEL;
                 }
@@ -485,18 +484,26 @@ contract EasySwapOrderBook is
         _isMatchAvailable(sellOrder, buyOrder, sellOrderKey, buyOrderKey);
 
         if (_msgSender() == sellOrder.maker) {
-            // 卖家卖出（以前挂的卖单）
+            // 卖家卖出（以前挂的买单）
             require(msgValue == 0, "HD: value > 0"); // sell order cannot accept eth
-            bool isSellExist = orders[sellOrderKey].order.maker != address(0); // check if sellOrder exist in order storage
+            bool isSellExist = (orders[sellOrderKey].order.maker != address(0)); // check if sellOrder exist in order storage
+            // 检查卖单在不在订单列表，如果不在就终止交易
+            // isSellExist，是否跳过过期时间检查
+            //外部订单： 订单不存在orders，isSellExist=false，不跳过过期时间检查
+            //内部订单： 订单存在orders，isSellExist=true，跳过过期时间检查（直接购买，所以跳过）
             _validateOrder(sellOrder, isSellExist);
+
+            // 检查买单在不在订单表，如果不在就终止交易（不跳过过期时间检查）
             _validateOrder(orders[buyOrderKey].order, false); // check if exist in order storage
 
             uint128 fillPrice = Price.unwrap(buyOrder.price); // the price of bid order
             if (isSellExist) {
-                // check if sellOrder exist in order storage , del&fill if exist
+                // 移除订单
                 _removeOrder(sellOrder);
+                // 更新卖单金额
                 _updateFilledAmount(sellOrder.nft.amount, sellOrderKey); // sell order totally filled
             }
+            // 更新买单金额
             _updateFilledAmount(filledAmount[buyOrderKey] + 1, buyOrderKey);
             emit LogMatch(
                 sellOrderKey,
@@ -507,6 +514,7 @@ contract EasySwapOrderBook is
             );
 
             // transfer nft&eth
+            // vault 合约把 eth 转给 卖家
             IEasySwapVault(_vault).withdrawETH(
                 buyOrderKey,
                 fillPrice,
