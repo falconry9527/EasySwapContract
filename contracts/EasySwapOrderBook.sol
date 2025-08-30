@@ -205,12 +205,12 @@ contract EasySwapOrderBook is
             filledAmount[LibOrder.hash(order)] == 0 // order cannot be canceled or filled
         ) {
             newOrderKey = LibOrder.hash(order);
-            // newOrderKey depends on : collection,tokenId,amount
             // deposit asset to vault
             if (order.side == LibOrder.Side.List) {
                 // 卖出 NFT ,先把 NFT 转进来
                 if (order.nft.amount != 1) {
-                    // limit list order amount to 1
+                    // 限价卖单限制数量为1，返回初始化地址表示挂单失败
+                    // 买单的 order.nft.amount 可用不是1 
                     return LibOrder.ORDERKEY_SENTINEL;
                 }
                 IEasySwapVault(_vault).depositNFT(
@@ -222,6 +222,7 @@ contract EasySwapOrderBook is
             } else if (order.side == LibOrder.Side.Bid) {
                 // 买单 ，先把ETH 转进来
                 if (order.nft.amount == 0) {
+                    // 买单金额不能是0，返回初始化地址表示挂单失败
                     return LibOrder.ORDERKEY_SENTINEL;
                 }
                 IEasySwapVault(_vault).depositETH{value: uint256(ETHAmount)}(
@@ -276,7 +277,7 @@ contract EasySwapOrderBook is
     ) internal returns (bool success) {
         LibOrder.Order memory order = orders[orderKey].order;
 
-        if (order.maker == _msgSender() &&filledAmount[orderKey] < order.nft.amount) {
+        if (order.maker == _msgSender() && filledAmount[orderKey] < order.nft.amount) {
             // only unfilled order can be canceled
             OrderKey orderHash = LibOrder.hash(order);
             // 从 orders 移除 

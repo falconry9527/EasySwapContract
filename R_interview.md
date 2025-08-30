@@ -29,6 +29,7 @@ withdrawNFT :  取出NFT
 
 ---OrderValidator: 订单验证器
 // 订单号 -> 订单金额 ：CANCELLED 为 已经取消
+// 有的NFT 是可以拆分的；本项目 卖单必须是1 ，买单可以不是1 
 mapping(OrderKey => uint256) public filledAmount;
 
 ---ProtocolManager: 管理协议费

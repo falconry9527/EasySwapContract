@@ -19,7 +19,7 @@ library LibOrder {
     struct Asset {
         uint256 tokenId;
         address collection;
-        uint96 amount; // 有的NFT 是可以拆分卖的，本项目都是不可拆分的
+        uint96 amount; // 有的NFT 是可以拆分的，本项目 卖单必须是1 ，买单可以不是1 
     }
 
     struct NFTInfo {
@@ -68,7 +68,7 @@ library LibOrder {
             "Order(uint8 side,uint8 saleKind,address maker,Asset nft,uint128 price,uint64 expiry,uint64 salt)Asset(uint256 tokenId,address collection,uint96 amount)"
         );
 
-    function hash(Asset memory asset) internal pure returns (bytes32) {
+    function hashAss(Asset memory asset) internal pure returns (bytes32) {
         return
             keccak256(
                 abi.encode(
@@ -89,7 +89,7 @@ library LibOrder {
                         order.side,
                         order.saleKind,
                         order.maker,
-                        hash(order.nft),
+                        hashAss(order.nft),
                         Price.unwrap(order.price),
                         order.expiry,
                         order.salt
