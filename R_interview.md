@@ -1,5 +1,7 @@
 # 合约架构整理
 ```
+contract kənˈtrækt
+
 --- EasySwapOrderBook: 业务逻辑层
 1.makeOrders : 下单
 2.matchOrders : 匹配订单
@@ -17,7 +19,7 @@ mapping(address => mapping(LibOrder.Side => RedBlackTreeLibrary.Tree)) public pr
 // 订单队列： 买入/卖出 -> （价格-> 价格队列）
 mapping(address => mapping(LibOrder.Side => mapping(Price => LibOrder.OrderQueue))) public orderQueues;
 
---- EasySwapVault : 钱包和转账层
+--- EasySwapVault （vɔːlt） : 钱包和转账层
 ETHBalance：用户eth余额
 NFTBalance：用户nft余额
 depositETH : 存入NFT
