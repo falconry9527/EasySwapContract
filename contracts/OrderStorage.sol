@@ -208,7 +208,6 @@ contract OrderStorage is Initializable {
             price = getBestPrice(collection, side);
         } else {
             price = getNextBestPrice(collection, side, price);
-
         }
 
         uint256 i;
@@ -274,9 +273,7 @@ contract OrderStorage is Initializable {
     ) external view returns (LibOrder.Order memory orderResult) {
         Price price = getBestPrice(collection, side);
         while (RedBlackTreeLibrary.isNotEmpty(price)) {
-            LibOrder.OrderQueue memory orderQueue = orderQueues[collection][
-                side
-            ][price];
+            LibOrder.OrderQueue memory orderQueue = orderQueues[collection][side][price];
             OrderKey orderKey = orderQueue.head;
             while (LibOrder.isNotSentinel(orderKey)) {
                 LibOrder.DBOrder memory dbOrder = orders[orderKey];
