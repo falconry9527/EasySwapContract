@@ -114,7 +114,10 @@ UUPS代理(Universal Upgradeable Proxy Standard)
 open zeppelin(ˈzepəlɪn)
 Re entrance Guard  Upgrade able
  (ɪnˈtræns  ɡɑːrd  ˈʌpɡreɪd)
-4. 多签: 提取手续费需要多签
+4. 多签: 
+vault : 
+面向用户的功能（买卖NFT）：指定只能由orderbook调用，加强代码审计和测试
+资产管理管理功能（提取手续费等）： 使用多签
 5. 合约升级的时候，不能修改 状态变量的顺序，否则状态变量的数据存储会乱
 ```
 
